@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>endeavor [at] rainbowsandpwnies.com - symbolic execution</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="http://tfpwn.rainbowsandpwnies.com/modelling-symbolic-memory.html">Modelling Symbolic Memory</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2012-08-11T18:59:00">
+                Sat 11 August 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/symbolic-execution.html">symbolic execution</a></p>
+</footer><!-- /.post-info --><p>My Symbolic Execution Engine creates a special-purpose VM environment for the purpose of symbolically executing programs. The VM has two locations for storing data, variables and memory. It's easy to associate registers with variables, and the virtual memory space available in userland to memory. This is correct enough for this post.</p>
+<p>The engine runs off an Intermediate Language (also known as Intermediate Representation) which is nothing more than a simple assembly language. rnp_see has 23 IR instructions. However, in memory the instructions to be executed are stored in the target assembly language encoding (for our cases, x86-64). We therefor have a translator which reads in an instruction in the target assembly language and outputs IR instructions.</p>
+<p>A basic loop for the VM would be:</p>
+<div class="highlight"><pre>loop :
+    target_instructions = memory(variables[InstructionPointer])
+    ir_instructions = translator(target_instructions)
+    execute(ir_instructions)
+</pre></div>
+<p>Where execute updates the variables and memory dependent on <tt class="docutils literal">ir_instructions</tt>.</p>
+<p>I use the notation <tt class="docutils literal">(bit_size {SSA Identifier} value)</tt> to denote symbolic values, where <tt class="docutils literal">(8 {0} 0x41)</tt> would be a single byte representing that character <tt class="docutils literal">'A'</tt> and:
+<tt class="docutils literal">(8 {0} (8 {1} wild) &lt; (8 {2} 0x41))</tt> represents all possible bytes less than <tt class="docutils literal">'A'</tt>. When not necessary, I'll omit the SSA Identifier, IE: <tt class="docutils literal">(8 (8 wild) &lt; (8 0x41))</tt></p>
+<p>There are two problems addressed in my memory model. The first problem is the growth of the engine as symbolic branches spur the creation of multiple symbolic VMs. A symbolic branch is one where the VM makes a decision based on a symbolic value which can follow multiple paths, such as</p>
+<div class="highlight"><pre>if ( (8 {0} wild) &lt; (8 {1} 0x41) ) {
+    update_state(conditions_A);
+} else {
+    update_state(conditions_B);
+}
+</pre></div>
+<p>Here the VM must be cloned, where in one branch <tt class="docutils literal">{0}</tt> takes the values less than <tt class="docutils literal">0x41</tt>, and in the other branch <tt class="docutils literal">{0}</tt> takes the values greater than <tt class="docutils literal">0x41</tt>.</p>
+<p>To deal with this, the memory model uses a copy-on-write policy. The new memory model will retain references to the original memory, broken into blocks referred to as pages. When a page is written to in either branch, it is copied first, and the respective memory model references the new page so as not to interfere with the other branch.</p>
+<p>Symbolic memory values, or memory locations whose values evaluate to expressions instead of concrete values, exist on a layer on top of the concrete values. We query first to see if a symbolic value is available. If a symbolic value is not available for the memory location, we return a concrete value and can bypass querying the SMT solver for further operations on this value, assuming other operands in future operations are also concrete.</p>
+<p>The other problem is one of personal preference. Assume we read a single byte of symbolic input, and this value is placed in a variable which is zero-extended to 64-bits. When we write this value back to memory, we will write 7 bytes of concrete values, but they are marked as symbolic.</p>
+<p>To compensate for this, each SymbolicValue (as the class is called) has a method called concretize(). Concretize will attempt to determine whether the value has only a single possible value.</p>
+<p>Assuming we have a symbolic value <tt class="docutils literal">(8 {0} <span class="pre">(some-expression))</span></tt>, we first query the SMT solver for a solution to <tt class="docutils literal">{0} == {0}</tt>. If the solution to this problem is <tt class="docutils literal">{1}</tt>, we then query for <tt class="docutils literal">{0} != {1}</tt>. If this second condition is unsatisfiable, the only possible value for <tt class="docutils literal">{0} is {1}</tt>.</p>
+<p>An example is given below:</p>
+<div class="highlight"><pre>concretize: (32 (32 (8 {57468} wild) &amp; (8 {57469} 0xff)) &gt;&gt; (8 {59062} 0x08))
+done concretizing
+concretized value at address 7fff0ae3748d
+</pre></div>
+<p>These three lines come from the use case above, where an 8-bit wild symbolic value has been zero-extended to 32-bits, and we are storing the 32-bit value back into the memory model. The second byte of this result is, however, not symbolic, and has the only possible value of 0. My engine will detect this and store a concrete value of 0 instead of a symbolic value.</p>
+<p>Why is this important? From a correctness standpoint it is not. The analysis of the program will be correct without this concretizing step. However, often not covered in academic papers is the frustrating purpose of engineering your engine. The fewer symbolic values being thrown around memory, the much cleaner the interpretation will be and the fewer headaches suffered.</p>
+                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/simple-symbolic-execution-engine-validation-in-concrete-environments.html" rel="bookmark"
+                           title="Permalink to Simple Symbolic Execution Engine Validation in Concrete Environments">Simple Symbolic Execution Engine Validation in Concrete Environments</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-07-10T15:00:00">
+                Tue 10 July 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/symbolic-execution.html">symbolic execution</a></p>
+</footer><!-- /.post-info -->                <div class="section" id="abstract">
+<h2>Abstract</h2>
+<p>To simplify analysis and implementation, host symbolic execution engines operate on a simple, RISC-like Intermediate Representation. Target assembly language is translated into this IR, forcing the translation to capture the full semantics of the host assembly language. To provide simple testing of this translation process, rnp_see forks a test ...</p></div>
+                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/simple-symbolic-execution-engine-validation-in-concrete-environments.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/making-a-symbolic-execution-engine.html" rel="bookmark"
+                           title="Permalink to Making a Symbolic Execution Engine">Making a Symbolic Execution Engine</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-06-28T15:00:00">
+                Thu 28 June 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/symbolic-execution.html">symbolic execution</a></p>
+</footer><!-- /.post-info -->                <div class="section" id="introduction">
+<h2>Introduction</h2>
+<p>In this post I present my work over the past couple weeks on a symbolic execution engine called <a class="reference external" href="http://github.com/endeav0r/rnp_see">rnp_see</a>. I am releasing it under the GPLv3 license here: rnp_see. Rnp_see is short for, &quot;Rainbows aNd Pwnies Symbolic Execution Engine,&quot; and is pronounced, &quot;rip see.&quot;</p>
+<p>Note that this is experimental ...</p></div>
+                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/making-a-symbolic-execution-engine.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+            </ol><!-- /#posts-list -->
+<p class="paginator">
+    Page 1 / 1
+</p>
+            </section><!-- /#content -->
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

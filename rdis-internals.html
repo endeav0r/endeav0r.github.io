@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Rdis Internals</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/rdis-internals.html" rel="bookmark"
+           title="Permalink to Rdis Internals">Rdis Internals</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-01-20T13:51:00">
+                Sun 20 January 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis.html">rdis</a></p>
+</footer><!-- /.post-info -->      <p>As the interested few wishing to hack on rdis begin to trickle in, I believe a basic orientation to the source is due. This walkthrough is not comprehensive, but should be enough to get you on the right track.</p>
+<div class="section" id="contributing-to-rdis">
+<h2>Contributing to rdis</h2>
+<p>The rdis source can be found here: <a class="reference external" href="https://github.com/endeav0r/rdis">https://github.com/endeav0r/rdis</a></p>
+<p>I ask that you please fork the repo on github and submit a pull request. Don't email me patches unless they are trivially minor. Pull requests are always preferred.</p>
+<p>Development discussion for #rdis takes place in irc.freenode.net#rdis . If you plan on contributing, please join us in #rdis and let me know.</p>
+<p>I don't have an issue with large pull requests, but it will be helpful if you let me know what's coming and what's being changed.</p>
+</div>
+<div class="section" id="the-object-container-model">
+<h2>The Object/Container Model</h2>
+<p>Almost everything in rdis is an object. We define an object as a struct which begins to a pointer to a vtable of type <tt class="docutils literal">struct _object</tt>. The use of rdis's object model may seem cumbersome and/or annoying at first, but once you get used to it you will find (hopefully) you're writing safer code faster. Here's <tt class="docutils literal">struct _object</tt>:</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">_object</span> <span class="p">{</span>
+    <span class="kt">void</span>     <span class="p">(</span><span class="o">*</span> <span class="n">delete</span><span class="p">)</span>      <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+    <span class="kt">void</span> <span class="o">*</span>   <span class="p">(</span><span class="o">*</span> <span class="n">copy</span><span class="p">)</span>        <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+    <span class="kt">int</span>      <span class="p">(</span><span class="o">*</span> <span class="n">cmp</span><span class="p">)</span>         <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">,</span> <span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+    <span class="kt">void</span>     <span class="p">(</span><span class="o">*</span> <span class="n">merge</span><span class="p">)</span>       <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">,</span> <span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+    <span class="n">json_t</span> <span class="o">*</span> <span class="p">(</span><span class="o">*</span> <span class="n">serialize</span><span class="p">)</span>   <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+<span class="p">};</span>
+</pre></div>
+<p>For example, let's take a look at the <tt class="docutils literal">_queue</tt> struct:</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">_queue</span> <span class="p">{</span>
+    <span class="k">const</span> <span class="k">struct</span> <span class="n">_object</span> <span class="o">*</span> <span class="n">object</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">size</span><span class="p">;</span>
+    <span class="k">struct</span> <span class="n">_queue_it</span> <span class="o">*</span> <span class="n">front</span><span class="p">;</span>
+    <span class="k">struct</span> <span class="n">_queue_it</span> <span class="o">*</span> <span class="n">back</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+<p>The vtable for queue looks as follows:</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="k">const</span> <span class="k">struct</span> <span class="n">_object</span> <span class="n">queue_object</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="p">(</span><span class="kt">void</span>   <span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">))</span>         <span class="n">queue_delete</span><span class="p">,</span>
+    <span class="p">(</span><span class="kt">void</span> <span class="o">*</span> <span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">))</span>         <span class="n">queue_copy</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span>
+    <span class="nb">NULL</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+<span class="p">};</span>
+</pre></div>
+<p>Every object should include, at a minimum, both delete and copy. This is because objects copy objects. They do this by calling <tt class="docutils literal">object_copy</tt>, which can be found in object.h:</p>
+<div class="highlight"><pre><span class="cp">#define object_copy(XYX) \</span>
+<span class="cp">    ((struct _object_header *) XYX)-&gt;object-&gt;copy(XYX)</span>
+</pre></div>
+<p>The general-purpose containers available in rdis are:</p>
+<ul class="simple">
+<li><tt class="docutils literal">_graph</tt> - A directed graph (delete/copy/cmp/merge/serialize) ; merge only required of graph_merge() is called</li>
+<li><tt class="docutils literal">_list</tt> - A doubly-linked list (delete/copy/serialize)</li>
+<li><tt class="docutils literal">_map</tt> - A mapping of uint64_t to objects (delete/copy/serialize)</li>
+<li><tt class="docutils literal">_queue</tt> - A simple queue (delete/copy)</li>
+<li><tt class="docutils literal">_tree</tt> - A self-balancing tree (delete/copy/serialize)</li>
+</ul>
+<p>list, graph, map and tree all have iterators. Lists can be modified with their iterators by calling <tt class="docutils literal">list_remove()</tt>. Graphs, maps and tree can NOT be modified during iteration. Add the objects you want to delete to a queue and delete them post iteration. The <tt class="docutils literal">_index</tt> object is also good for this purpose.</p>
+<p>The objects used internally by containers are to be modified only by their respective container calls. I will not accept code that does otherwise. I have attempted to break this rule several times myself, specifically with graph edges. It has always ended in disaster.</p>
+<p>As stated above, if you pass an object to another object, and the object needs to keep that data, it will call <tt class="docutils literal">object_copy()</tt>. If you fetch data from an object, it returns a pointer to that object, NOT a copy.</p>
+<p>The other objects available are:</p>
+<ul class="simple">
+<li><tt class="docutils literal">_buffer</tt> - A simple, dumb buffer of memory.</li>
+<li><tt class="docutils literal">_function</tt> - Self-explanatory.</li>
+<li><tt class="docutils literal">_index</tt> - Wraps uint64_t in an object so it can be used in containers.</li>
+<li><tt class="docutils literal">_instruction</tt> - Self-explanatory.</li>
+<li><tt class="docutils literal">_label</tt> - Contains an address, string and label type (IE: LABEL_FUNCTION)</li>
+<li><tt class="docutils literal">_rdstring</tt> - An object containing a string. Use of char * strings is preferred.</li>
+<li><tt class="docutils literal">_reference</tt> - Information about a data reference from an instruction.</li>
+</ul>
+<p>There are a few special combination of data structures used in rdis:</p>
+<ul class="simple">
+<li><tt class="docutils literal">Loader Graph</tt> - A graph of lists of instructions.</li>
+<li><tt class="docutils literal">Function Map</tt> - A map of addresses to functions.</li>
+<li><tt class="docutils literal">Label Map</tt> - A map of addresses to labels.</li>
+<li><tt class="docutils literal">Memory Map</tt> - A map of buffers.</li>
+</ul>
+<p>Code that works on these special combinations of data structures does NOT belong in the respective container classes. The code can be stored either where needed, or in util.c.</p>
+</div>
+<div class="section" id="the-loading-process">
+<h2>The loading process</h2>
+<p>Loaders are a special type of object with additional methods. The loader object vtable layout can be found in loader/loader.h . The steps to load a file are as follows:</p>
+<ol class="arabic simple">
+<li>Call <tt class="docutils literal">loader_create(const char * filename)</tt></li>
+<li><tt class="docutils literal">loader_create()</tt> will call the create method of implemented loaders. Loaders return a pointer to a valid loader object if they match the executable, or NULL otherwise.</li>
+<li>Supposing a valid loader was returned by <tt class="docutils literal">loader_create()</tt>, we call <tt class="docutils literal">loader_memory_map()</tt> to grab the memory map from the loader.</li>
+<li>Using this memory map, we call <tt class="docutils literal">loader_functions()</tt> to receive the function map.</li>
+<li>We pass the memory map and function map back to the loader in <tt class="docutils literal">loader_graph_functions()</tt>, which recursively disassembles each function.</li>
+<li>Finally, we pass the memory map and functions to <tt class="docutils literal">loader_labels_functions()</tt> to label our functions, and retrieve any other labels in the binary.</li>
+</ol>
+<p>The loaders are designed to disassemble based of state, not the data in the executable file. This is why we continue to pass the memory map back to loader functions. This is important when we write disassembler lua scripts for rdis, as state changes while the executable file remains the same (think debugger -&gt; lua -&gt; rdis).</p>
+</div>
+<div class="section" id="rdis-callbacks">
+<h2>Rdis callbacks</h2>
+<p>The state of rdis as a whole is contained in the <tt class="docutils literal">_rdis</tt> object. Different objects can register callbacks to the <tt class="docutils literal">_rdis</tt> object, and they are called when different actions in rdis take place. This is how we update the rdis gui. Generally-speaking, callbacks should not trigger actions that further modify rdis state.</p>
+<p>Each callback is identified by a unique <tt class="docutils literal">uint64_t</tt> identifier. The object that creates the callback should keep this identifier so that it may remove itself from the callbacks when deleted.</p>
+</div>
+<div class="section" id="lua-scripting">
+<h2>Lua Scripting</h2>
+<p>There are a few things to remember when writing code that allows lua scripts to interface with rdis objects.</p>
+<p>Lua objects are always copies of rdis objects. They never contain pointers to objects stored externally to their independent lua instance.</p>
+<p>The lua VM is recreated everytime rdis loads a new executable is loaded from outside of lua. When a lua script loads an executable, the lua state is not recreated.</p>
+</div>
+<div class="section" id="rdis-gui">
+<h2>Rdis GUI</h2>
+<p>The _gui struct keeps track of everything happening in the rdis gui. Because the gui is not an rdis object, I'm going to refer to it simply as, &quot;The gui.&quot; All windows should be launched by calling their respective function over the gui, for example <tt class="docutils literal">gui_funcwindow()</tt>.</p>
+<p>Rdg stands for Rdis Display Graph, and is an object which turns loader graphs into cairo surfaces. You don't work with rdg directly, just launch rdg windows with <tt class="docutils literal">gui_rdgwindow()</tt>.</p>
+</div>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

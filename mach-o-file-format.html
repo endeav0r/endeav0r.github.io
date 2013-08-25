@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Mach-O File Format</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/mach-o-file-format.html" rel="bookmark"
+           title="Permalink to Mach-O File Format">Mach-O File Format</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-03-27T20:00:00">
+                Wed 27 March 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis2.html">rdis2</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a></p>
+</footer><!-- /.post-info -->      <div class="section" id="introduction">
+<h2>Introduction</h2>
+<p><a class="reference external" href="http://github.com/endeav0r/rdis2">Rdis2</a>, the rewrite of <a class="reference external" href="http://github.com/endeav0r/rdis">rdis</a>, will include support for the Mach-O file format. In addition, I will be writing a mach-o plug-in for <a class="reference external" href="https://github.com/simsong/bulk_extractor">bulk_extractor</a> in the near future. <a class="reference external" href="http://github.com/endeav0r/macho-dump">I have been hacking away to discover how the Mach-O file format works</a>. Here's what you need to know in order to jump-start your understanding.</p>
+<p>Mach-O, like many other executable formats, contains separate structures for 32 and 64-bit versions of programs. The layout of these structs is essentially equivalent, and for brevity we will only cover the 32-bit version of these structs.</p>
+<p>This is a quick run-through. If you're unfamiliar with executable formats, this may not be the article for you.</p>
+</div>
+<div class="section" id="struct-fat-header">
+<h2><tt class="docutils literal">struct fat_header</tt></h2>
+<p>If you're disassembling binaries found in Mac OS X, you're probably going to encounter fat binaries. Fat binaries are containers which hold multiple, complete mach-o binaries within.</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">fat_header</span> <span class="p">{</span>
+    <span class="kt">uint32_t</span> <span class="n">magic</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">nfat_arch</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="cp">#define FAT_MAGIC   0xcafebabe</span>
+<span class="cp">#define FAT_CIGAM   0xbebafeca</span>
+</pre></div>
+<p><tt class="docutils literal">magic</tt> will contain the value <tt class="docutils literal">0xcafebabe</tt> or, if the binary is encoded in the reverse endian-ness of the machine you're parsing with, <tt class="docutils literal">0xbebafeca</tt>. If you encounter <tt class="docutils literal">FAT_CIGAM</tt>, understand the rest of the <tt class="docutils literal">fat_*</tt> values will be reversed in endianness.</p>
+<p><tt class="docutils literal">nfat_arch</tt> will contain the number of <tt class="docutils literal">struct fat_arch</tt> structs immediately following <tt class="docutils literal">struct fat_header</tt>.</p>
+</div>
+<div class="section" id="struct-fat-arch">
+<h2><tt class="docutils literal">struct fat_arch</tt></h2>
+<p><tt class="docutils literal">struct fat_arch</tt> contains information about each of the mach-o binaries contained within the fat binary.</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">fat_arch</span> <span class="p">{</span>
+    <span class="kt">uint32_t</span> <span class="n">cputype</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">cpusubtype</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">offset</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">size</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">align</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+<p><tt class="docutils literal">struct fat_arch</tt> is fairly self-explanatory. It will have the same endian-ness of <tt class="docutils literal">struct fat_header</tt>.</p>
+<p>The file <tt class="docutils literal"><span class="pre">mach-o/loader.h</span></tt> contains several <tt class="docutils literal">#define</tt> for <tt class="docutils literal">CPU_TYPE</tt> and <tt class="docutils literal">CPU_SUBTYPE</tt>.</p>
+<p><tt class="docutils literal">offset</tt> and <tt class="docutils literal">size</tt> describe the portion of the mach-o file containing the architecture-specific mach-o.</p>
+</div>
+<div class="section" id="struct-mach-header">
+<h2><tt class="docutils literal">struct mach_header</tt></h2>
+<p><tt class="docutils literal">struct mach_header</tt> is the traditional first header of a mach-o binary. It appears as follows:</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">mach_header</span> <span class="p">{</span>
+    <span class="kt">uint32_t</span> <span class="n">magic</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">cputype</span><span class="p">;</span>    <span class="c1">// typedef as int in mach/machine.h</span>
+    <span class="kt">uint32_t</span> <span class="n">cpusubtype</span><span class="p">;</span> <span class="c1">// typedef as int in mach/machine.h</span>
+    <span class="kt">uint32_t</span> <span class="n">filetype</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">ncmds</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">sizeofcmds</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">flags</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="cp">#define MH_MAGIC 0xfeedface</span>
+<span class="cp">#define MH_CIGAM 0xcdfaedfe</span>
+</pre></div>
+<p>Similar to <tt class="docutils literal">struct fat_header</tt>, <tt class="docutils literal">struct mach_header</tt> begins with a 4-byte magic value. Depending on the magic value the endian-ness of the mach-o binary in relation to the host architecture can be determined. This endian-ness may be different than that found in <tt class="docutils literal">struct fat_header</tt>, and from this point you should consider the mach-o a separate, self-contained file.</p>
+<p><tt class="docutils literal">cputype</tt> and <tt class="docutils literal">cpusubtype</tt> have the same meaning (and values) as found in <tt class="docutils literal">struct fat_arch</tt>.</p>
+<p><tt class="docutils literal">filetype</tt> has one of the following values:</p>
+<div class="highlight"><pre><span class="cp">#define MH_OBJECT       0x1</span>
+<span class="cp">#define MH_EXECUTE      0x2</span>
+<span class="cp">#define MH_FVMLIB       0x3</span>
+<span class="cp">#define MH_CORE         0x4</span>
+<span class="cp">#define MH_PRELOAD      0x5</span>
+<span class="cp">#define MH_DYLIB        0x6</span>
+<span class="cp">#define MH_DYLINKER     0x7</span>
+<span class="cp">#define MH_BUNDLE       0x8</span>
+<span class="cp">#define MH_DYLIB_STUB   0x9</span>
+<span class="cp">#define MH_DSYM         0xa</span>
+<span class="cp">#define MH_KEXT_BUNDLE  0xb</span>
+</pre></div>
+<p>Immediately following <tt class="docutils literal">struct mach_header</tt> are a series of load commands. The number of load commands, as well as the combined size of these commands in bytes, is found in <tt class="docutils literal">ncmds</tt> and <tt class="docutils literal">sizeofcmds</tt>. The size of each one of these load commands is dependent on the type of load command.</p>
+<p><tt class="docutils literal">flags</tt> contains a series of flags, also available in <tt class="docutils literal"><span class="pre">mach-o/loader.h</span></tt> that we will not discuss here.</p>
+</div>
+<div class="section" id="struct-load-command">
+<h2><tt class="docutils literal">struct load_command</tt></h2>
+<p><tt class="docutils literal">struct load_command</tt> is a common 8-byte header to all load commands.</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">load_command</span> <span class="p">{</span>
+    <span class="kt">uint32_t</span> <span class="n">cmd</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">cmdsize</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+<p><tt class="docutils literal"><span class="pre">mach-o/loader.h</span></tt> contains a series of <tt class="docutils literal">#define</tt> pragmas with values for <tt class="docutils literal">cmd</tt>. We can determine the size of this load command from <tt class="docutils literal">cmdsize</tt> and skip over it accordingly if we find it uninteresting.</p>
+<p>The few load commands we will cover are:</p>
+<div class="highlight"><pre><span class="cp">#define LC_SEGMENT 0x1</span>
+<span class="cp">#define LC_SYMTAB  0x2</span>
+<span class="cp">#define LC_THREAD  0x4</span>
+</pre></div>
+</div>
+<div class="section" id="struct-segment-command-and-struct-section">
+<h2><tt class="docutils literal">struct segment_command</tt> and <tt class="docutils literal">struct section</tt></h2>
+<p><tt class="docutils literal">struct segment_command</tt> contains information necessary to load a portion of the mach-o file into memory.</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">segment_command</span> <span class="p">{</span>
+    <span class="kt">uint32_t</span> <span class="n">cmd</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">cmdsize</span><span class="p">;</span>
+    <span class="kt">char</span>     <span class="n">segname</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
+    <span class="kt">uint32_t</span> <span class="n">vmaddr</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">vmsize</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">fileoff</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">filesize</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">maxprot</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">initprot</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">nsects</span><span class="p">;</span>
+    <span class="kt">uint32_t</span> <span class="n">flags</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+<p>Each segment is followed by a series of sections which include specific information about a section of the file to load into memory.</p>
+<div class="highlight"><pre><span class="k">struct</span> <span class="n">section</span> <span class="p">{</span>
+    <span class="kt">char</span>        <span class="n">sectname</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
+    <span class="kt">char</span>        <span class="n">segname</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
+    <span class="kt">uint32_t</span>    <span class="n">addr</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">size</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">offset</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">align</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">reloff</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">nreloc</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">flags</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">reserved1</span><span class="p">;</span>
+    <span class="kt">uint32_t</span>    <span class="n">reserved2</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+<p>Instead of explaining each field for <tt class="docutils literal">struct segment_command</tt> and <tt class="docutils literal">struct section</tt>, many of which are self-explanatory, I'll include an example of a segment_command with sections.</p>
+<div class="highlight"><pre>load_command SEGMENT
+lc-&gt;cmdsize  1d0
+  segname  __TEXT
+  vmaddr   1000
+  vmsize   18000
+  fileoff  0
+  filesize 18000
+  maxprot  READ WRITE EXECUTE
+  initprot READ EXECUTE
+  nsects   6
+  flags    FVMLIB NORELOC
+    section 0
+      sectname __text
+      segname  __TEXT
+      addr     184c
+      size     12826
+      offset   84c
+      align    2
+      reloff   0
+      nreloc   0
+      flags    ATTR_PURE_INSTRUCTIONS SECTION_ATTRIBUTES_SYS ATTR_SOME_INSTRUCTIONS
+    section 1
+      sectname __symbol_stub
+      segname  __TEXT
+      addr     14072
+      size     1aa
+      offset   13072
+      align    1
+      reloff   0
+      nreloc   0
+      flags    ATTR_PURE_INSTRUCTIONS SECTION_ATTRIBUTES_SYS ATTR_SOME_INSTRUCTIONS ATTR_LOC_RELOC SYMBOL_STUBS
+
+    section 2
+      sectname __stub_helper
+      segname  __TEXT
+      addr     1421c
+      size     2d4
+      offset   1321c
+      align    2
+      reloff   0
+      nreloc   0
+      flags    ATTR_PURE_INSTRUCTIONS SECTION_ATTRIBUTES_SYS ATTR_SOME_INSTRUCTIONS ATTR_LOC_RELOC
+    section 3
+      sectname __cstring
+      segname  __TEXT
+      addr     144f0
+      size     4a83
+      offset   134f0
+      align    4
+      reloff   0
+      nreloc   0
+      flags    2
+    section 4
+      sectname __const
+      segname  __TEXT
+      addr     18f80
+      size     30
+      offset   17f80
+      align    4
+      reloff   0
+      nreloc   0
+      flags    0
+    section 5
+      sectname __unwind_info
+      segname  __TEXT
+      addr     18fb0
+      size     48
+      offset   17fb0
+      align    0
+      reloff   0
+      nreloc   0
+      flags    0
+</pre></div>
+</div>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Control Flow Graphs Should Be Magical Time-Traveling Devices</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/control-flow-graphs-should-be-magical.html" rel="bookmark"
+           title="Permalink to Control Flow Graphs Should Be Magical Time-Traveling Devices">Control Flow Graphs Should Be Magical Time-Traveling Devices</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-02-14T00:55:00">
+                Thu 14 February 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
+</footer><!-- /.post-info -->      <p>If you didn't know, I've spent some time recently writing a disassembler and thinking about disassembly. I'm going to outline some of my thoughts on where I think disassembly needs to go. There are gaps in this post. Consider it food for thought.</p>
+<p>We currently have two methods for disassembling programs. We have linear/sweep disassembly, where bytes are disassembled immediately following one another. We also have recursive disassembly, where we look at each instruction to determine its successors. The problem with both of these methods is we're not treating instructions like data.</p>
+<p>We need to treat disassembly as a state-ful experience. We are analyzing a living, breathing program, not a static, ordered series of numbers. We need to treat disassembly as a product of data-flow analysis. By adding additional intelligence to our disassembly process, and changing our expectations of what a disassembly tool should give us, we will get more meaningful data, I mean code, well, same thing.</p>
+<p>We need to emulate (perhaps symbolically) our program's behavior during runtime. During this analysis, instead of saving the values possible at various portions of our program's execution we should be saving the statements to be executed. This is the data which belongs in our control-flow graphs.</p>
+<p>Take a look at a shikata_ga_nai encoded x86 linux bind_tcp payload from metasploit</p>
+<div class="highlight"><pre>msfpayload linux/x86/shell/bind_tcp R | msfencode -e x86/shikata_ga_nai -t elf &gt; /tmp/payload
+</pre></div>
+<p>When I graph this executable in rdis, I get the following:</p>
+<img alt="" class="align-center" src="http://tfpwn.rainbowsandpwnies.com/files/cfgmagic-two.png" />
+<p>Wow, this isn't even remotely correct. These are not the instructions that will be interpreted by our CPU. This is not the program contained in my /tmp/payload executable. These are just the bytes that were present at the time we conducted recursive disassembly. Programs are composed of data. They are state-ful. This graph isn't very helpful.</p>
+<p>It's state-less.</p>
+<p>We should think of our CFGs as a journey through the execution of our program. At each stop in our journey we extract one specific piece of information, the statement to be executed, and we save it in a graph.</p>
+<p>Caveat: There's an obvious problem with this approach. If we attempt to perfectly disassemble our programs in this manner we may encounter (possibly maliciously induced) explosive growth in our CFG, making this problem infeasible for machines with finite memory. In all practicality, we may consider this approach impossible to implement perfectly. We will need to apply heuristics and accept imperfect results.</p>
+<p>I propose we begin disassembling our programs in environments which allow us to treat our code as data. We should emulate our programs in limited environments and, as we continue through our program's execution, extract the instructions to be executed. This is what we should be viewing in our CFGs.</p>
+<p>How should we display these CFGs? What happens when the data composing our code does change? Should we go back in time and edit our CFG, or disregard the old data? I have some thoughts.</p>
+<p>An instruction should contain two pieces of information: data and location. When added to our CFG, our CFG should track, &quot;time,&quot; or state.</p>
+<p>Let's start with a simple program, a loop with a conditional branch contained within.</p>
+<img alt="" src="http://tfpwn.rainbowsandpwnies.com/files/cfg-one.png" />
+<p>During our analysis of this program, we discover that the code in [D] is polymorphic. At some point in our execution, an instruction in [D] changes. We will now show our CFG with stateful information.</p>
+<img alt="" src="http://tfpwn.rainbowsandpwnies.com/files/cfg-two.png" />
+<p>Here we have [D] -&gt; [F], which represents [D] in one state, {0}. We also have [G], which represents the altered state of [D]. These nodes are stateful. Let's say [G]'s successor is [A]. How would I display this CFG?</p>
+<img alt="" src="http://tfpwn.rainbowsandpwnies.com/files/cfg-three.png" />
+<p>Because the location and data of [A] has not changed, [G]'s successor [A] remains the original [A]. [A] now includes the data that exists in both state {0} of our program, as well as state {1}.</p>
+<p>As we continue to analyze this function, we discover that the only reachable portions of our CFG in {1} are [A] -&gt; [B], [B] -&gt; [D], [D] -&gt; [G] and [G] -&gt; [A].</p>
+<img alt="" src="http://tfpwn.rainbowsandpwnies.com/files/cfg-four.png" />
+<p>This is the information I want to see when analyzing a program. I want my program interpreted as data, and the state of the program displayed in a visual manner.</p>
+<p>I'll conclude this post for now, with more to follow at a later date.</p>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
         <meta charset="utf-8">
-        <title>endeavor [at] rainbowsandpwnies.com</title>
+        <title>endeavor [at] rainbowsandpwnies.com - ctf-writeup</title>
         <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
         <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
 
@@ -724,115 +724,11 @@ jmp xor_jmp
 <span class="n">fh</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </pre></div>
                 </article>
-            </aside><!-- /#featured -->
-                <section id="content" class="body">
-                    <h1>Other articles</h1>
-                    <hr />
-                    <ol id="posts-list" class="hfeed">
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/mach-o-file-format.html" rel="bookmark"
-                           title="Permalink to Mach-O File Format">Mach-O File Format</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2013-03-27T20:00:00">
-                Wed 27 March 2013
-        </abbr>
-
-        <address class="vcard author">
-                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
-        </address>
-<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
-<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis2.html">rdis2</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a></p>
-</footer><!-- /.post-info -->                <div class="section" id="introduction">
-<h2>Introduction</h2>
-<p><a class="reference external" href="http://github.com/endeav0r/rdis2">Rdis2</a>, the rewrite of <a class="reference external" href="http://github.com/endeav0r/rdis">rdis</a>, will include support for the Mach-O file format. In addition, I will be writing a mach-o plug-in for <a class="reference external" href="https://github.com/simsong/bulk_extractor">bulk_extractor</a> in the near future. <a class="reference external" href="http://github.com/endeav0r/macho-dump">I have been hacking away to discover how the Mach-O file format works</a>. Here's what you need to know in ...</p></div>
-                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/mach-o-file-format.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/a-method-for-emulated-disassembly.html" rel="bookmark"
-                           title="Permalink to A Method for Emulated Disassembly">A Method for Emulated Disassembly</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2013-02-18T11:00:00">
-                Mon 18 February 2013
-        </abbr>
-
-        <address class="vcard author">
-                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
-        </address>
-<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
-<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis.html">rdis</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
-</footer><!-- /.post-info -->                <p>Last night I wrote a simple emulated disassembler for rdis. I will elaborate more on how to use this disassembler as it becomes more complete, but I'm going to start this blog post with some results.</p>
-<p>Observe the following x86 program:</p>
-<div class="highlight"><pre><span class="cp">%define SYS_EXIT  1</span>
-
-<span class="k">section</span> <span class="nv">.text</span>
-    <span class="k">global</span> <span class="nv">_start</span>
-
-<span class="nf">_start ...</span></pre></div>
-                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/a-method-for-emulated-disassembly.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/a-magical-time-traveling-control-flow-graph.html" rel="bookmark"
-                           title="Permalink to A Magical Time-Traveling Control Flow Graph">A Magical Time-Traveling Control Flow Graph</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2013-02-18T02:24:00">
-                Mon 18 February 2013
-        </abbr>
-
-        <address class="vcard author">
-                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
-        </address>
-<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
-<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis.html">rdis</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a></p>
-</footer><!-- /.post-info -->                <p>I wrote previously about how control flow graphs should show the evolution of a program over time. I've since begun hacking out an x86 emulator and including it in rdis in order to illustrate the point.</p>
-<p>The following graph may be a bit buggy (I literally just wrote the ...</p>
-                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/a-magical-time-traveling-control-flow-graph.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-
-            <li><article class="hentry">
-                <header>
-                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/control-flow-graphs-should-be-magical.html" rel="bookmark"
-                           title="Permalink to Control Flow Graphs Should Be Magical Time-Traveling Devices">Control Flow Graphs Should Be Magical Time-Traveling Devices</a></h1>
-                </header>
-
-                <div class="entry-content">
-<footer class="post-info">
-        <abbr class="published" title="2013-02-14T00:55:00">
-                Thu 14 February 2013
-        </abbr>
-
-        <address class="vcard author">
-                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
-        </address>
-<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
-<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
-</footer><!-- /.post-info -->                <p>If you didn't know, I've spent some time recently writing a disassembler and thinking about disassembly. I'm going to outline some of my thoughts on where I think disassembly needs to go. There are gaps in this post. Consider it food for thought.</p>
-<p>We currently have two ...</p>
-                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/control-flow-graphs-should-be-magical.html">read more</a>
-                </div><!-- /.entry-content -->
-            </article></li>
-            </ol><!-- /#posts-list -->
 <p class="paginator">
-    Page 1 / 4
-        <a href="http://tfpwn.rainbowsandpwnies.com/index2.html">&raquo;</a>
+    Page 1 / 1
 </p>
+            </aside><!-- /#featured -->
+            </ol><!-- /#posts-list -->
             </section><!-- /#content -->
         <section id="extras" class="body">
                 <div class="blogroll">

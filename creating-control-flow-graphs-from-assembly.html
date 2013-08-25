@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Creating Control Flow Graphs from Assembly</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/creating-control-flow-graphs-from-assembly.html" rel="bookmark"
+           title="Permalink to Creating Control Flow Graphs from Assembly">Creating Control Flow Graphs from Assembly</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-10-27T16:12:00">
+                Sat 27 October 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rainbowsandpwnies.html">rainbowsandpwnies</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/haxathon.html">haxathon</a></p>
+</footer><!-- /.post-info -->      <p>Several people doing haxathon have begun, or spoken about, graphing challenges written in HSVM assembly. I'm going to explain the basic process I go through for creating Control Flow Graphs from assembly.</p>
+<p>Assume we have a basic assembly language with four instructions:</p>
+<div class="highlight"><pre>OPERATION
+BRANCH      (ADDR)
+COND_BRANCH (ADDR)
+HLT
+</pre></div>
+<p>An <tt class="docutils literal">OPERATION</tt> will cause control flow to pass directly to the next instruction. <tt class="docutils literal">BRANCH</tt> will cause execution to continue at a target address. <tt class="docutils literal">COND_BRANCH</tt> will cause execution to follow one of two branches. <tt class="docutils literal">HLT</tt> will cause execution to, for our purposes, stop.</p>
+<p>Here are some example x86 instructions and how we will classify them:</p>
+<div class="highlight"><pre>OPERATION   : add, sub, mov, call
+BRANCH      : jmp
+COND_BRANCH : jl je jg
+HLT         : ret hlt
+</pre></div>
+<p>The reason we classified these instructions the way we did will become more apparent as we go.</p>
+<p>We will now create a fictitious graphing library. Several are available, or you can use your own. Our library will have the following functions:</p>
+<div class="highlight"><pre>add_vertex(G, vertex);
+add_edge(G, head, tail);
+</pre></div>
+<p>We now loop through our instructions in two passes. In the first pass we will create vertices for all the instructions, as well as edges from <tt class="docutils literal">OPERATION</tt> and <tt class="docutils literal">COND_BRANCH</tt> vertices to the next vertex.</p>
+<div class="highlight"><pre>last_address = -1
+last_type    = -1
+for ins in instructions {
+
+    add_vertex(G, ins)
+
+    if (    (last_type == OPERATION)
+         or (last_type == COND_BRANCH)) {
+        add_edge(G, last_address, ins.address)
+
+    if (    (ins.type == HLT)
+         or (ins.type == BRANCH))
+        break
+
+    last_address = ins.address
+    last_type    = ins.type
+
+}
+</pre></div>
+<p>We will now go through and add edges for <tt class="docutils literal">BRANCH</tt> and <tt class="docutils literal">COND_BRANCH</tt> instructions.</p>
+<div class="highlight"><pre>for ins in instructions {
+    if (    (ins.type == BRANCH)
+         or (ins.type == COND_BRANCH)) {
+        add_edge(G, ins.address, ins.target_address)
+    }
+}
+</pre></div>
+<p>At this point in time we have a valid control flow graph. However, we have graphs that look like this:</p>
+<div class="highlight"><pre>      |
+      V
++------------+
+| OPERATION  |
++------------+
+
+      |
+      V
++------------+
+| OPERATION  |
++------------+
+
+      |
+      V
++-------------+
+| COND_BRANCH |
++-------------+
+      |   \____________
+
+      |                |
+      V                V
++------------+  +------------+
+| HLT        |  | HLT        |
++------------+  +------------+
+</pre></div>
+<p>When what we want is:</p>
+<div class="highlight"><pre>      |
+      V
++-------------+
+| OPERATION   |
+| OPERATION   |
+| COND_BRANCH |
++-------------+
+      |   \____________
+
+      |                |
+      V                V
++------------+  +------------+
+| HLT        |  | HLT        |
++------------+  +------------+
+</pre></div>
+<p>I'm going to use <em>rednovae terminology</em> for things which may have official names, but, since I don't know them, <em>rednovae terminology</em>. <em>Rednovae terminology</em> will be italicized. <em>Rednovae terminology</em> my conflict with actual graph theory terminology. Work with me here.</p>
+<p>We need to <em>reduce</em> our graphs by combining <em>singly-adjacent-vertices</em>. <em>Singly-adjacent-vertices</em> are vertices that have an edge between them, with no other edges on those sides of the vertices.</p>
+<p>Now: Given a directional graph <tt class="docutils literal">D</tt> with a set of vertices <tt class="docutils literal">V</tt> and edges <tt class="docutils literal">E</tt>, where each edge <tt class="docutils literal">e</tt> in <tt class="docutils literal">E</tt> consists of a head <tt class="docutils literal">H</tt> and tail <tt class="docutils literal">T</tt> <tt class="docutils literal">(H, T)</tt> such that <tt class="docutils literal">H</tt> and <tt class="docutils literal">T</tt> are both elements of <tt class="docutils literal">V</tt>, we declare vertices <tt class="docutils literal">{vA}</tt>, <tt class="docutils literal">{vB}</tt>, <tt class="docutils literal">{vC}</tt> and <tt class="docutils literal">{vD}</tt> and edges <tt class="docutils literal">(vA, vB)</tt>, <tt class="docutils literal">(vB, vC)</tt>, <tt class="docutils literal">(vC, vA)</tt>, <tt class="docutils literal">(vC, vD)</tt>.</p>
+<p>This graph looks like:</p>
+<div class="highlight"><pre>  {vA}&lt;-\
+   |    |
+   V    |
+  {vB}  |
+   |    |
+   V    |
+  {vC}--/
+   |
+   V
+  {vD)
+</pre></div>
+<p>Starting with <tt class="docutils literal">(vA)</tt>, we check its successors. <tt class="docutils literal">vA</tt> has one successor, <tt class="docutils literal">vB</tt>. <tt class="docutils literal">vB</tt> has one predecessor. Therefor, these vertices are <em>singly-adjacent</em> and we combine them.</p>
+<div class="highlight"><pre>  {vA+vB}&lt;-\
+
+   |       |
+   V       |
+  {vC}-----/
+   |
+   V
+  {vD}
+</pre></div>
+<p>We now check vertex <tt class="docutils literal">{vA+vB}</tt>. <tt class="docutils literal">{vA+vB}</tt> has one successor, <tt class="docutils literal">{vC}</tt>, and <tt class="docutils literal">{vC}</tt> has one predecessor, making it <em>singly-adjacent</em>. We combine <tt class="docutils literal">{vA+vB}</tt> with <tt class="docutils literal">{vC}</tt></p>
+<div class="highlight"><pre>  {vA+vB+vC}&lt;-\
+
+   |     |    |
+   V     \----/
+  {vD}
+</pre></div>
+<p>We now check vertex <tt class="docutils literal">{vA+vB+vC}</tt>. <tt class="docutils literal">{vA+vB+vC}</tt> has two successors. Therefor it is not <em>singly-adjacent</em> with any of its successors.</p>
+<p>We move to the next vertex, <tt class="docutils literal">{vD}</tt>. <tt class="docutils literal">{vD}</tt> has no successors. We move to the next vertex, of which there are none, so we are done.</p>
+<p>This process runs in 2N time for constructing the original graph, where N is the number of instructions found in the assembly, and N time for reducing the graph, where N is the number of vertices found in the original graph.</p>
+<p>To visualize this graph, I recommend you become familiar with graphviz and the dot language. You can loop through all vertices, adding their information to your dot file, and do the same for your edges.</p>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

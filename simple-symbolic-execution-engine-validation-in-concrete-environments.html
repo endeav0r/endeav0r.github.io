@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Simple Symbolic Execution Engine Validation in Concrete Environments</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/simple-symbolic-execution-engine-validation-in-concrete-environments.html" rel="bookmark"
+           title="Permalink to Simple Symbolic Execution Engine Validation in Concrete Environments">Simple Symbolic Execution Engine Validation in Concrete Environments</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-07-10T15:00:00">
+                Tue 10 July 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/symbolic-execution.html">symbolic execution</a></p>
+</footer><!-- /.post-info -->      <div class="section" id="abstract">
+<h2>Abstract</h2>
+<p>To simplify analysis and implementation, host symbolic execution engines operate on a simple, RISC-like Intermediate Representation. Target assembly language is translated into this IR, forcing the translation to capture the full semantics of the host assembly language. To provide simple testing of this translation process, rnp_see forks a test executable, breaks at the entry address, and loads the executable into the symbolic execution engine. It then steps through the binary running in the target environment as well as in the symbolic execution engine. By comparing the General Purpose Registers at each step, rnp_see can quickly identify bugs and ensure a certain level of accuracy in the translation.</p>
+</div>
+<div class="section" id="preparing-for-validation">
+<h2>Preparing for validation</h2>
+<p>Rnp_see consists of multiple parts, one of which is a loader. The original loader for rnp_see, given a 64-bit ELF binary for linux, created, from scratch, a 64-bit linux userland environment for the VM. I recently wrote an additional loader, currently named Lx86, which loads the executable, breaks at the entry point, and then context switches from native execution to execution within rnp_see. This is done by instantiating Lx86 and passing it to the VM at instantiation time. Lx86 has the same functionality outlined in my previous post for the Elf loader, which both now inherit from an abstract virtual class simply named Loader.</p>
+<p>By adding two additional methods to Lx86, Lx86 gains the functionality to single step through the loaded executable and dump the general purpose registers. This functionality is used to compare the program running in the native environment against the program running in the rnp_see environment.</p>
+</div>
+<div class="section" id="stepping-through-the-program">
+<h2>Stepping through the program</h2>
+<p>After loading, the program is stepped through in both rnp_see and the native environment, printing both native instructions and IR instructions. At each step, the GPRs are fetched and compared. If the GPRs diverge at any step, execution is halted and all GPRs are displayed with diverging GPRs highlighted. If GPRs diverge, the problem can be quickly identified from the given output, fixed, and validation rerun to discover more bugs.</p>
+<p>During testing, I used csmith, a tool designed to create random C code to test for compiler bugs. Symbolic execution is inherently slower than native execution, and csmith programs take many instructions to run. To speed up testing, once diverging registers were identified the validator would always be restarted on the instruction immediately proceeding the bug. This allowed for rnp_see execution to begin at the problem area, bypassing the slow process of translating and executing the previous instructions, and quickly identifing whether the bug was solved.</p>
+</div>
+<div class="section" id="system-calls">
+<h2>System Calls</h2>
+<p>In the x86-64 calling convention used by linux, not all registers must be preserved across function calls. This includes system calls. Recalling that rnp_see emulates kernel functionality, several registers would diverge across system calls, even if the system call was producing good results. To fix this problem during validation, rnp_see system calls were forced to return the same values in trashed registers as were returned in native execution. Fortunately, the values returned were deterministic and this fix worked.</p>
+</div>
+<div class="section" id="ptrace-singlestep-problems">
+<h2>PTRACE_SINGLESTEP Problems</h2>
+<p>For unknown reasons, PTRACE_SINGLESTEP in Ubuntu 12.04 running inside VirtualBox would occassionally step two instructions instead of one. This would cause the validator to throw errors for diverging instructions. To solve this problem, the values of the instruction pointers are compared at each step before the rest of the registers. If the instruction pointers diverge, rnp_see is given one more step to catch up with native execution. In some very weird cases, such as an instruction sequence:</p>
+<div class="highlight"><pre><span class="nf">jcc</span> <span class="mh">0x1</span>
+<span class="nf">nop</span>
+</pre></div>
+<p>This may incorrectly show identical behavior between rnp_see and native execution.</p>
+</div>
+<div class="section" id="methodology-problems">
+<h2>Methodology Problems</h2>
+<p>This method of validating rnp_see is not comprehensive. It tests only the instruction instances encountered in the test cases, and only their effects on GPRs. Other methods, such as <a class="reference external" href="http://research.microsoft.com/en-us/um/people/pg/public_psfiles/pldi2012.pdf">Microsft RiSE's Automated Synthesis of Symbolic Instruction Encodings from I/O Samples</a> ensure greater accuracy in the translation. For example, this method may not catch errors in ScaleIndexBase calculations for memory operands.</p>
+</div>
+<div class="section" id="results">
+<h2>Results</h2>
+<p>Despite the lack of comprehensiveness, this method proved quick to implement and accurate enough to allow rnp_see to begin passing its test cases in concrete execution. I recommend this as a first step to insure some level of accuracy to those who are writing their own symbolic execution engines from scratch.</p>
+</div>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

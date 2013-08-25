@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Hosting Haxathon</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/hosting-haxathon.html" rel="bookmark"
+           title="Permalink to Hosting Haxathon">Hosting Haxathon</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-11-24T18:11:00">
+                Sat 24 November 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rainbowsandpwnies.html">rainbowsandpwnies</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/haxathon.html">haxathon</a></p>
+</footer><!-- /.post-info -->      <p>Haxathon was a continuous, challenge-based security CTF with a focus on exploitation, reverse-engineering, cryptology and general binary-foo magic. Most of the competition took place in the Haxathon Supremacy Virtual Machine, which is a 16-bit big-endian RISC VM.</p>
+<p>While Haxathon challenge servers will remain operational until 07 DEC 2012, I have disabled scoring in order to facilitate the posting of write ups.</p>
+<p>Final Scores of Top 10 Players</p>
+<ol class="arabic simple">
+<li>acez        - 1550</li>
+<li>wont        - 1550</li>
+<li>NiklosKoda  - 1550</li>
+<li>themadllama - 1350</li>
+<li>FrizN       - 1350</li>
+<li>nitin       - 1200</li>
+<li>vonr1ch     - 1000</li>
+<li>414D41      - 850</li>
+<li>ufox        - 850</li>
+<li>ercool      - 850</li>
+</ol>
+<div class="section" id="challenges">
+<h2>Challenges</h2>
+<p>&quot;Flag File,&quot; indicates the goal of the challenge is to open a file named, &quot;Flag,&quot; and read the contents.</p>
+<div class="section" id="key-hsvm-50-points">
+<h3>key - HSVM - 50 points</h3>
+<p>This challenge XORed user input with 0x77 and compared it against 8 bytes. If the input matched, the user was given a message indicating success. The bytes required for the success message comprised the flag for this challenge.</p>
+</div>
+<div class="section" id="backdoor-hsvm-50-points">
+<h3>backdoor - HSVM - 50 points</h3>
+<p>This challenge reads in input from the data and then jumps directly to first given byte. This is a, &quot;Flag File,&quot; challenge.</p>
+</div>
+<div class="section" id="backdoor1-5-hsvm-100-points">
+<h3>backdoor1.5 - HSVM - 100 points</h3>
+<p>This challenge requires the user to enter a name which is compared against a 12 byte string pushed onto the stack. The string is &quot;blackknights&quot;. Once this string has been matched, the server enters a loop where it reads one byte from /dev/urandom, sends this byte to the user, reads one byte from the user, XORs the byte from the user and writes it to a buffer starting from 0x8000. Once the server XORs a byte resulting in 0x99, it jumps to the shellcode at 0x8000. This is a, &quot;Flag File,&quot; challenge.</p>
+</div>
+<div class="section" id="backdoor2-hsvm-75-points">
+<h3>backdoor2 - HSVM - 75 points</h3>
+<p>The user inputs shellcode which is XORed with 0x99 and stored at a buffer starting at 0x8000. Once a byte, XORed with 0x99, is equal to 0x00 or 0x0a the server will jump to the shellcode. This is a, &quot;Flag File,&quot; challenge.</p>
+</div>
+<div class="section" id="news-hsvm-100-points">
+<h3>news - HSVM - 100 points</h3>
+<p>strcpy buffer overflow of a stack return address with, &quot;Details.&quot; This is a, &quot;Flag File,&quot; challenge.</p>
+</div>
+<div class="section" id="sum-crypto-200-points">
+<h3>sum - Crypto - 200 points</h3>
+<p>Sum presents the attacker with a custom cryptographic hash with insufficient confusion. It can be solved by a SAT solver in about an hour on a Samsung Series 9 laptop. To score, the attacker must find a message that when hashed results in the 8 byte output of 0000000000000000.</p>
+</div>
+<div class="section" id="players-hsvm-200-points">
+<h3>players - HSVM - 200 points</h3>
+<p>Players requires exploitation of a use-after-free vulnerability. The attacker must follow a specific order of allocations and frees, overwrite data for a freed object, and then call a method on that object to gain control of the instruction pointer. The heap allocator and object logic was programmed in HSVM assembly, so the task of figuring out what exactly is happening is a bit daunting itself. This is a, &quot;Flag File,&quot; challenge. The CFG for this challenge is gigantic compared to other haxathon challenges.</p>
+</div>
+<div class="section" id="image-hsvm-150-points">
+<h3>image - HSVM - 150 points</h3>
+<p>Image reads in an ASCII art image compressed with RLE. During decompression, the length of decompression for a single byte during RLE is not checked. This allows the attacker to overflow the stack frame with a one byte sequence (0xABAB). This is a, &quot;Flag File,&quot; challenge.</p>
+</div>
+<div class="section" id="hidden-key-hsvm-125-points">
+<h3>hidden_key - HSVM - 125 points</h3>
+<p>This challenge has nothing to do with hidden keys. This challenge is a buffer overflow with a stack layout of [ret][stack canary][pointer to buf][buf]. The attacker must overwrite the pointer to buf and use this pointer to overwrite memory at an attacker-controlled location. Overwriting the stack canary will cause the program to properly exit. This is a, &quot;Flag File,&quot; challenge.</p>
+</div>
+<div class="section" id="checkout-crypto-150-points">
+<h3>checkout - Crypto - 150 points</h3>
+<p>This challenge consists of an insecure format for RC4 encrypting information. The format of encrypted messages consists of a 4 byte length, the message, and a 4 byte additive checksum. By flipping bits 32-bits apart from on another, the attacker may or may not invalidate the checksum. The server will return a message indicating the validity of the checksum. The attacker can use this information to discover the plaintext one bit at a time.</p>
+</div>
+<div class="section" id="inception-hsvm-150-points">
+<h3>inception - HSVM - 150 points</h3>
+<p>This challenge consists of a VM programmed in HSVM assembly. The attacker must reverse the VM to discover an input that will cause the program to output a message indicating success.</p>
+</div>
+<div class="section" id="mod48-hsvm-200-points">
+<h3>mod48 - HSVM - 200 points</h3>
+<p>This challenge is a stack frame return address buffer overflow. However, the modulus of each byte against 0x30 is taken and written to the stack. This eliminates a large amount of the HSVM instruction set, and the attacker must return to a function whose address bytes are less than 0x30. Such a function was available. This challenge required a return-to-libc approach to exploit. This was a, &quot;Flag File,&quot; challenge.</p>
+</div>
+</div>
+<div class="section" id="lessons-learned">
+<h2>Lessons Learned</h2>
+<p>End your contest immediately following the last challenge. The last challenge was released 02 NOV 2012. However, Haxathon continues until 07 DEC 2012. Originally we didn't know how many challenges would be present in the complete contest and we wished to leave room for expansion. Instead of planning to expand the contest in time, we should have planned to make the contest more dense in challenges.</p>
+<p>More challenges earlier on. While players unfamiliar with reverse-engineering spent a good deal of time on the first few challenges, several players completed these challenges in under an hour. When first entering a contest, reversers don't enjoy waiting.</p>
+<p>Expect the horde. I ended up posting haxathon on r/netsec. We had over 90 registrations in the next 24 hours. While we handled this well, expectations were closer to 30. As of this writing, 290 players have registered for the Haxathon. 60 players have scored. A few more than that have attempted to score, but they still need to try harder.</p>
+<p>Send an email when your contest starts. We had several players who showed up in IRC after the contest started and said, &quot;Oh, I didn't know this thing had started already.&quot; Those are the people we heard from. A reminder email would have been nice.</p>
+<p>Expect to write all the challenges. In addition to writing the website that hosted haxathon, I also authored the HSVM and all the challenges. Be prepared to write all of the challenges for your contest, and don't count on receiving challenges from outside (or inside) sources.</p>
+</div>
+<div class="section" id="things-i-believe-we-did-right">
+<h2>Things I believe we did right</h2>
+<p>Log all the bits, lock down the challenges. We log every page a logged-in user visits, all incorrect submissions, all traffic to the web server and challenge server, everything. Additionally, we have code that quickly displays this information in a meaningful manner. We can quickly correlate the actions taken by an IP address or user, the times those actions were taken, and use them to make educated decisions on what people are doing. We had some hiccups, but, to my knowledge, we didn't fall over. Oldgregg was responsible for securing the challenge server, and I believe he did a good job. I watched him work his magic through tmux. Wow.</p>
+<p>Put some simple challenges first, and have someone else quantify, &quot;Simple.&quot; Originally, news was the first challenge. I thought this challenge was straight-forward. I also wrote the entire contest and VM from the ground up. Having someone else take a look at a couple challenges allowed me to rework the early challenges in the competition. Several simpler, easier challenges were written and front-loaded.</p>
+</div>
+<div class="section" id="and-in-closing">
+<h2>And... In Closing...</h2>
+<p>If you're interested in haxathon, I encourage you to give it a look. Everything is still operational over at haxathon.com. If you're considering hosting your own contest and have some questions on what that experience is like, feel free to leave a comment or get in touch with me on an individual basis.</p>
+</div>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

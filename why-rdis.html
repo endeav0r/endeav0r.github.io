@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Why Rdis</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/why-rdis.html" rel="bookmark"
+           title="Permalink to Why Rdis">Why Rdis</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-11-17T18:08:00">
+                Sat 17 November 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rainbowsandpwnies.html">rainbowsandpwnies</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/haxathon.html">haxathon</a></p>
+</footer><!-- /.post-info -->      <p>When I began writing rdis, I knew I wanted a visual tool that understood assembled programs in the same manner that I understood assembled programs. Unfortunately, I wasn't able to place my finger on exactly what that understanding was. After reading Chris Eagle's Ida Pro Book, or perhaps more accurately jumping through the book in a few hours, and reading <a class="reference external" href="http://kunststube.net/encoding/">What Every Programmer Absolutely, Positively Needs To Know About Encodings And Character Sets To Work With Text</a>, I believe I have reached a definition:</p>
+<p>&quot;The separation of meaning from its storage medium.&quot;</p>
+<p>Let us begin with an ordered set of bytes, <tt class="docutils literal">{0=0x41, 1=0x42, 2=0x43, 3=0x44}</tt>. What is the meaning behind these bytes? Well, it depends. It may be a little-endian representation of the ASCII string <tt class="docutils literal">&quot;ABCD&quot;</tt>, it may be the address <tt class="docutils literal">0x41424344</tt>, it may be the instructions <tt class="docutils literal">inc eax; inc edx; inc ebx; inc esp;</tt>, it may be an ordered set of four garbage bytes, it may be a combination of the above, or it may be something else entirely.</p>
+<p>Whatever combination of the above examples we use to extract meaning from the above ordered set of bytes, they key is we extract understanding from, not apply understanding to, this ordered set of bytes.</p>
+<p>Let us assume we will interpret <tt class="docutils literal">0x41424344</tt> as the ASCII string <tt class="docutils literal">&quot;ABCD&quot;</tt>. What we should not do is create a string reference to address 0 and mark that reference as type string. What we should do is create a string with the value <tt class="docutils literal">&quot;ABCD&quot;</tt>. We can add metadata to this string, such as, &quot;This string was found at address 0.&quot;</p>
+<p>Data changes during runtime, and our program may replace our bytes <tt class="docutils literal">0x41424344</tt> with <tt class="docutils literal">0x44434241</tt>. This does NOT change the meaning or value we extracted from our original value, <tt class="docutils literal">0x41424344</tt>. What we have is a new value, and we should extract that value and apply meaning to it appropriately. The immediate difference between these two values is state. The way our program interprets this new value should also affect the way we understand this new value.</p>
+<p>By approaching disassembly in this fashion, we more closely mirror the behavior of the machine which interprets our assembly. Below is one immediate benefit of this approach.</p>
+<p>When rdis disassembles a program, it makes no assumptions about the bytes within the program. Given a set of entry points, it disassembles one instruction. From that instruction we extract a set of addresses that control flow may continue to after that byte. If we naivele disassembe an ordered set of bytes, where disassembly of one instruction begins immediately following the disassembly of a previous instruction, we will not achieve the original meaning of the program.  However, if we recursively extract information from our bytes, we will extract the correct information.</p>
+<p>Because rdis extracts, instead of applies, understanding, we automatically avoid incorrect disassemblies from control flows which defeat naive disassemblies. Rdis understands that given a set of 8 ordered bytes, there may be instructions of varied length beginning at each of those bytes. Instead of applying understanding to the bytes, rdis extracts understanding and could, potentially, arrive at eight separate, correct disassemblies while creating its internal, directed graph representation of the program. Instructions which jump to addresses which are in the middle of what would normally be a naively disassembled instruction do not affect rdis, as bytes in rdis do not have meaning attached to them. Rdis extracts the correct meaning from these bytes.</p>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Again on Instructions: There Is No Spoon</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/again-on-instructions-there-is-no-spoon.html" rel="bookmark"
+           title="Permalink to Again on Instructions: There Is No Spoon">Again on Instructions: There Is No Spoon</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-01-31T01:38:00">
+                Thu 31 January 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
+</footer><!-- /.post-info -->      <div class="section" id="an-edit-from-the-future">
+<h2>An Edit From the Future</h2>
+<p>I mention the Defcon 20 talk &quot;Programming Weird Machines with ELF Metadata&quot; in this article. After rewatching the video (<a class="reference external" href="https://www.defcon.org/html/links/dc-archives/dc-20-archive.html#Shapiro">Which you should watch, you are a fool if you don't</a>), I believe 90% of what you are about to read is merely ideas planted during the this talk, waiting to bloom into realization. The underlying, core concepts here are, &quot;Weird Machines,&quot; which is the result of work done by a number of academics. <a class="reference external" href="http://www.cs.dartmouth.edu/~sergey/langsec/papers/Bratus.pdf">Here is a link to one of their papers</a>.</p>
+</div>
+<div class="section" id="forward">
+<h2>Forward</h2>
+<p>Not surprisingly, I spend a lot of time writing code. Perhaps surprisingly, I spend at least an equal amount of time thinking about the code I write. Sometimes, while thinking about code, I have moments of realization and enlightenment. Things click. Occasionally, during these moments of enlightenment, I start writing them down in a blog post. I rarely make my way through the blog post to completion. Once in a blue moon, I hit submit. The post Thoughts on Instructions was one of these blue moon moments.</p>
+<p>I am lucky to have a single individual who occasionally ventures to my blog and reads my post. After reading Thoughts on Instructions, he politely told me, &quot;What the hell are you talking about dude? You're making little sense.&quot; I'm paraphrasing here, but the point stands.</p>
+<p>This is an attempt to rephrase parts of Thoughts on Instructions.</p>
+<p>Please do not confuse the words &quot;incorrect&quot; with &quot;not useful&quot;. A technique can be useful and bring a wealth of value, yet still be incorrect.</p>
+</div>
+<div class="section" id="code-is-data">
+<h2>Code is Data</h2>
+<p>To simplify our understanding of systems which operate over instructions, we logically categorize values into two groups, code and data. However &quot;code&quot; is just an artificial label we apply to a subset of these values. In the end, code is just values interpreted by a machine, and at the level these values are interpreted at they should be recognized as data.</p>
+<p>In other words, code is data which can be interpreted by a machine. This is something we should all be familiar with.</p>
+<p>I am reminded of a statement I heard from Sergey Bratus at this previous defcon during the Programming Weird Machines with ELF Metadata talk. I will have to paraphrase, but Sergey stated that ROP chains should be thought of as instructions utilizing the gadgets as a VM. He is right on. When we think about our rop chains at this level of abstraction, those return addresses become instructions for our machine, and we can label the chain itself as code.</p>
+<p>To re-reiterate &quot;code&quot; is just a label we apply to data to simplify our understanding of how this data will be used.</p>
+</div>
+<div class="section" id="there-is-no-code-it-s-data-all-the-way-down">
+<h2>There is no code. It's data all the way down.</h2>
+<p>Let's start drawing some conclusions.</p>
+<p>Control-Flow Analysis can be thought of as Data-Flow Analysis for the machine which interprets the &quot;code&quot;. We are determining the different values that may be present in the machine which interprets our &quot;code&quot;. For example, when we encounter a conditional jump, our machine's value which holds the next instruction (think a CPUs internal store of the memory fetched from what the instruction pointer points to) can hold a range of values, values that we may label as code.</p>
+<p>If this example is a bit too far-fetched for you, consider performing data-flow analysis on a bytecode VM. What's the data? It's your &quot;code&quot;.</p>
+<p>Because code is merely a label attached to data interpreted by some sort of machine, the only requirements for programming are:
+A machine that accepts data and updates some sort of state.
+A method of providing the machine with data.
+This is why the Defcon talk, Programming Weird Machines with ELF Metadata, was interesting. We have taken a machine, the linux loading process, supplied it with specially crafted data, and we have created a program.</p>
+<p>The concept should not be new to security researchers.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Method</th>
+<th class="head">Data</th>
+<th class="head">Machine</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>ROP</td>
+<td>Crafted Stack Frames</td>
+<td>Gadgets</td>
+</tr>
+<tr><td>SQLI</td>
+<td>Unsanitized User Input</td>
+<td>SQL Engine</td>
+</tr>
+<tr><td>Classic Buffer Overflow</td>
+<td>Oversized User Input</td>
+<td>Native CPU</td>
+</tr>
+<tr><td>XSS</td>
+<td>Attacker-Crafted DHTML/Script</td>
+<td>Web Browser</td>
+</tr>
+</tbody>
+</table>
+<p>It's no surprise that the majority of defenses/mitigations deal with either attempting to separate data from code (parameterized queries), or restricting data from being executed by a machine (W/X memory protections). It's also no surprise that attackers continue to find new machines (have you HEARD of css injects!?), ways to have their data interpreted regardless (these XSS cheatsheets are getting ridiculous), or a combination of the two (ROP chain to mprotect).</p>
+</div>
+<div class="section" id="control-flow-analysis-is-useful">
+<h2>Control-Flow Analysis is useful</h2>
+<p>As reverse-engineers, we need to make sense of data. A large part of this process is the labeling of data as code. In binary analysis, we call this process &quot;disassembling.&quot; Linear, or sweep, disassembly is the process of labeling contiguous blocks of data as code. Recursive disassembly is the process of analyzing disassembled data to discover more data to disassemble. Recursive disassembly is control-flow analysis.</p>
+<p>While not correct, the assumption that code will not change greatly simplifies its analysis and aids in our ability to understand it. Therefor, I'm going to make the statement that Control-Flow Analysis is &quot;stateless&quot;. The analysis is conducted irrespective of state. This may seem a bit off, as code is data and does have state, but if we are going to visualize code we need to make some assumptions.</p>
+<p>Data-Flow Analysis is &quot;state-ful&quot; in that it cannot be done irregardless of state. In fact  it's the study of how state changes over time.</p>
+</div>
+<div class="section" id="final-thoughts">
+<h2>Final thoughts</h2>
+<ul class="simple">
+<li>Control-Flow Analysis should be conducted at least each time the state involved in its original analysis changes.</li>
+<li>Reflecting the results of Data-Flow Analysis back into Control-Flow Analysis is incorrect, as it requires using information from the &quot;future&quot; to make decisions about the &quot;present&quot;. It's an unhealthy mixing of stateless and state-ful information.</li>
+<li>We should be searching for new machines that can accept data and update state.</li>
+</ul>
+<p>I'll buy a beer for the first person who writes a compiler to network packets, using a remote machine's TCP/IP stack as a machine to run a program.</p>
+</div>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

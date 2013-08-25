@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>endeavor [at] rainbowsandpwnies.com - crypto</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="http://tfpwn.rainbowsandpwnies.com/a-basic-introduction-to-communicating-securely-with-pgp.html">A Basic Introduction to Communicating Securely with PGP</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2011-03-29T15:00:00">
+                Tue 29 March 2011
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/crypto.html">crypto</a></p>
+</footer><!-- /.post-info --><p>This post is a basic explanation of the concepts behind sending/receiving messages with PGP. This is the basic information I want someone to understand before I start communicating with them. These explanations are fairly simplified.</p>
+<p>Infeasible means it is very, very difficult to do something. In cryptology, this usually equates to something along the lines of, &quot;It's possible with known algorithms and the expected advancements in hardware, but it will take thousands/millions of years.&quot;</p>
+<div class="section" id="what-is-pgp">
+<h2>What is PGP</h2>
+<p>PGP stands for Pretty Good Privacy, and is a program originally developed in the 90s to send and received encrypted emails. It is <em>not</em> an encryption algorithm. It provides a basic format for using various algorithms and best-practices in cryptology to send messages between people. PGP has now become the colloquial word used for a variety of concepts used with this format. A PGP Key is a key that can be used with PGP to encrypt/decrypt emails. A PGP encrypted email is an email that could be decrypted with PGP, given a PGP key. Again, <em>PGP is not a cryptographic algorithm</em>.</p>
+<p>I personally use <a class="reference external" href="http://www.gnupg.org/">GnuPG</a> along with <a class="reference external" href="http://enigmail.mozdev.org/">enigmail</a> to communicate using PGP formatted messages.</p>
+</div>
+<div class="section" id="the-three-casic-types-of-encryption">
+<h2>The Three Casic Types of Encryption</h2>
+<p>PGP uses all three of these. We will hit them briefly now, and then again at the end.</p>
+<div class="section" id="symmetric-encryption">
+<h3>Symmetric Encryption</h3>
+<p>Symmetric encryption is used to exchange information between two parties with one key. This key is shared, a &quot;shared secret&quot;, and the security of symmetric encryption relies on the safe-guarding of this shared secret (the key). Relative to asymmetric encryption, symmetric encryption is fast. AES stands for the Advanced Encryption Standard, comes in 128 and 256 bit flavors (128 is considered secure/unbreakable, but 256 is available to comply with requirements but forth by NIST when they were evaluating candidates for AES), and replaces 3DES, which was three consecutive rounds of DES and was the previous encryption standard.</p>
+<ul class="simple">
+<li>Key: Both parties have same, shared key</li>
+<li>Example Algorithms: AES, Blowfish, Twofish, 3DES</li>
+<li>Speed: Fast</li>
+<li>Security Relies On: Safe-guarding shared key</li>
+</ul>
+</div>
+<div class="section" id="asymmetric-encryption">
+<h3>Asymmetric Encryption</h3>
+<p>Asymmetric encryption is used to exchange information between two parties where one party has a known &quot;public&quot; key, and uses this known &quot;public&quot; key to encrypt information for another party. This information can only be decrypted with the &quot;private&quot; key which is kept secret. Asymmetric encryption is based on mathematical problems that are infeasible to solve. Relative to symmetric encryption, asymmetric encryption is slow. RSA and the Diffie-Hellman Key Exchange are two basic methods (based on two different infeasible-to-solve problems) for implementing asymmetric encryption.</p>
+<p>There are TWO KEYS in asymmetric encryption, the &quot;private&quot; key and the &quot;public&quot; key. Ok, technically there are four keys, one pair for signing and one pair for encrypting, but we will pretend there are two keys and abstract some details for quick understanding. If I want to send you a message, I use your public key to encrypt your message. Only you, with your private key, can decrypt that message. If you send me a message, you can use your private key to sign that message. I can then use your public key to verify the signature, and mathematically prove that the message comes from you.</p>
+<ul class="simple">
+<li>Key: You have a secret, private key, and you share a public key with EVERYONE</li>
+<li>Example Algorithms: RSA, Diffie-Hellman Key Exchange</li>
+<li>Speed: Slow</li>
+<li>Security Relies On: Safe-guarding private key and verifying public key</li>
+</ul>
+<p>We will return to security relies on.</p>
+</div>
+<div class="section" id="cryptographic-hash">
+<h3>Cryptographic Hash</h3>
+<p>A cryptographic hash is a &quot;one-way&quot; cryptographic operation where we input data of arbitrary length and end up with a unique number. Hash is used colloquially to refer to both the algorithm, and the resulting &quot;sum&quot; of the hashing algorithm. We will use &quot;sum&quot; to mean the result of the hashing operation. A cryptographic has two very special properties by definition.</p>
+<ul class="simple">
+<li>Preimage Resistance:Given the sum of a hash, it is infeasible to create or find any input that will hash to that same sum.</li>
+<li>Collision Resistance: It is infeasible to find any two inputs that will hash to the same sum.</li>
+</ul>
+<p>Preimage resistance means you do not get to pick the sum. Collision resistance means you can pick the sum. Collision attacks are easier to implement than preimage attacks. Some implementations of cryptographic hashing algorithms are still valid if the hash can withstand preimage attacks but falls prone to collision attacks. Anything that deals with PGP (key fingerprints, signing emails) requires both strong preimage and collision resistance.</p>
+<ul class="simple">
+<li>Key: There is no key</li>
+<li>Example Algorithms: OLD_DO_NOT_USE(MD4, MD5, SHA1) USE(SHA256/SHA512 (these are both sha2 with different block sizes))</li>
+<li>Speed: fast</li>
+<li>Security Relies On: The strength of the hashing algorithm</li>
+</ul>
+</div>
+</div>
+<div class="section" id="understanding-asymmetric-encryption-security-concerns">
+<h2>Understanding Asymmetric Encryption Security Concerns</h2>
+<p>Fingerprint: A cryptographic hash (sum) of a public key. Usually when I say, &quot;verify public key,&quot; I mean the fingerprint. PGP/GnuPG will generate these fingerprints for you.</p>
+<p>Symmetric security is pretty easy to understand. Cryptographic encryption is also pretty easy to understand. Asymmetric encryption, however, has a few special implications we will need to cover. These come from the second security requirement of asymmetric encryption: verifying the public key.</p>
+<p>Imagine a scenario where I post my public key to a website and then tell you to go download my public key (exactly like my key available on rainbowsandpwnies.com). Unbeknownst to either you or me, someone has:</p>
+<ul class="simple">
+<li>Hacked into rainbowsandpwnies.com and modified the key stored there.</li>
+<li>Is sitting between you and rainbowsandpwnies.com and giving you fake information.</li>
+<li>Modifying the key you will end up receiving by some other means.</li>
+</ul>
+<p>This third party instead gives you their public key. You send a message to me, encrypting it with the public key of the third party. They then decrypt this message, read it, re-encrypt it with my real public key, and then send the message to me. The third party can even sign the message with their private key and send me their public key. You and I will now communicate, believing we are speaking secretly, but our messages are being read by third parties.</p>
+<p>In order to know we are speaking secretly, we must be sure that our messages are coming directly from one another. To do this, two things need to happen:</p>
+<ul class="simple">
+<li>You must know, with certainty, that you have my real public key. I must know, with certainty, that I have your public key.</li>
+<li>If I receive a message from you, it must be signed with your public key (that I know belongs to you). Vice-versa for messages you receive from me.</li>
+</ul>
+<p>There are multiple models for establishing trust. One popular model involves what is called a Certificate Authority. In this model, everyone has the public key of a trusted entity known as the Certificate Authority. You send your public key to the Certificate Authority in what is known as Certificate Signing Request. The Certificate Authority then verifies your identity (by some other means) and then signs your certificate. When you send me your public key, you also send you certificate signed by the Certificate Authority. I can use the Certificate Authority's public key (that I already have and trust) to verify his signature on your certificate, and because your public key is in that certificate, I transfer my trust of the Certificate Authority, through the certificate, to that public key. I now know that public key belongs to you, and can trust that public key with equal trust as I trust the Certificate Authority. This model is referred to as Public Key Infrastructure (PKI). You can have your PGP key signed by a CA, if you want, for a fee.</p>
+<p>There is another model for trust, known as the Web of Trust. The easiest way to imagine the Web of Trust is to think of each user as a <em>Certificate Authority</em>. In the Web of Trust, users &quot;sign&quot; the public keys of other users whom they verify. We can now base our trust of a public key equally to the amount of trust we place in the users who signed that public key. We place trust in the signers based on our confidence in them to both safeguard their private keys, and properly verify the public keys they sign. That's a two part trust there, and it's important to understand both of them.</p>
+<ul class="simple">
+<li>If I trust Mark to both safeguard his private key and to only sign public keys he properly verifies, and Mark has signed your key, then I can transfer that trust to your key.</li>
+<li>If I trust Mark to safeguard his private key but I don't believe Mark uses proper methods to verify other public keys, I will not trust his signature of your key.</li>
+<li>If I trust Mark to use proper methods to verify other public keys but do not think Mark properly safeguards his key, I will not trust his signature of your key.</li>
+</ul>
+<p>The &quot;Web&quot; part of the Web of Trust comes from the &quot;filtering&quot; down of this trust. Imagine I trust Mark fully, and Mark trusts Steve fully. If Steve signs Katie's key, then I will trust Katie's key. There is more to the Web of Trust, but if you just understand the concepts discussed above then you (and I) will be OK.</p>
+</div>
+<div class="section" id="verifying-signing-public-keys">
+<h2>Verifying/Signing Public Keys</h2>
+<p>There are two very important parts to verifying a public key before you sign/trust it.</p>
+<ul class="simple">
+<li>You must be certain the other person is who they say they are.</li>
+<li>You must be certain the method in which they are giving you their public key is one that can not be intercepted and modified.</li>
+</ul>
+<p>The easiest way to do this is to meet the person face-to-face, exchange multiple forms of identification (a passport and driver's license, for example), and then exchange fingerprints of public keys. <a class="reference external" href="http://en.wikipedia.org/wiki/Key_signing_party">You can make it into a party</a>.</p>
+<p>If you already know the person well enough to be certain of their identity, then any method which can not be intercepted and modified will suffice. IE: you could meet them face-to-face (this is always preferred). Another method I sometimes use is a webcam chat with someone I know where I simultaneously write out, in view of the camera, and vocally speak each letter of the fingerprint.
+Safeguarding your Key</p>
+<p>In addition to verifying the keys of others, you must also safeguard your own private key. <strong>Losing your private key can have severe consequences relative to the amount of trust other people have placed in your ability to safeguard it.</strong> In this context, &quot;losing,&quot; your private key means someone else has a copy of your private key. You may (and most likely will) still have your private key. You must maintain control of your private key at all times. Do not use your private key on insecure machines. Other people are counting on you to maintain your key.</p>
+<p>Here is a list of acceptable places to use/store your private key to decrypt and sign emails:</p>
+<ul class="simple">
+<li>On a computer that you, and you alone, control, that other people do not and will not tamper with, and that you keep patched and secure.</li>
+<li>On an encrypted piece of removable storage</li>
+</ul>
+<p>Here is a list of unacceptable places to use/store your private key to decrypt and sign emails, <em>regardless of how badly you need/want to sign and/or decrypt an email</em>:</p>
+<ul class="simple">
+<li>A computer that is owned by your university/employer/government/friend/parents.</li>
+<li>That computer, that you own, in your living room, that your Aunt Susie uses to read emails and play bejeweled on when she visits every other Tuesday.</li>
+<li>Your smartphone (especially iPhone/Android). (CEO, Here is a bunch of details of our company's intellectual property that we would be ruined if our competitors discovered. Don't worry, this email is encrypted. Sincerely, Employee -- sent from iPhone).</li>
+<li>On an unencrypted thumbdrive (or any other unencrypted removable media). Ever.</li>
+</ul>
+</div>
+<div class="section" id="a-quick-understanding-of-how-pgp-encrypts-signs-your-messages">
+<h2>A quick understanding of how PGP encrypts/signs your messages</h2>
+<p>First, there are a lot of considerations when implementing a cryptographically secure solution like PGP. The quality of random numbers, side-channel attacks, padding and many other considerations are all taken into account. Don't try a homebrew solution.</p>
+<p>To encrypt a message, PGP will first encrypt the message with a symmetric encryption algorithm such as AES and a random key. This is because symmetric encryption is fast. PGP will then encrypt the random key with your public key. It will send the symmetrically encrypted text, along with the asymmetrically encrypted key, to you. You decrypt the key, and then decrypt the text.</p>
+<p>To sign a message, PGP will cryptographically hash your entire message. This is because cryptographic hashes are fast. Now, remember when we said you really had four keys instead of two? Well, you have a separate pair of signing keys. With your signing keys, your &quot;encryption&quot; or signing key is kept secret, and your &quot;decryption&quot; or verifying key is public. You use your private signing key to encrypt the cryptographic hash of the message. You send the encryption of the cryptographic hash with the message. Whomever receives your message can hash it, and then use your public verifying key to decrypt your signature. If the decrypted hash from the signature matches the hash the recipient generated of your message, then message is valid. In this case, valid means the recipient knows the message came from you and was not modified in any way.</p>
+</div>
+                </article>
+<p class="paginator">
+    Page 1 / 1
+</p>
+            </aside><!-- /#featured -->
+            </ol><!-- /#posts-list -->
+            </section><!-- /#content -->
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Thoughts on Instructions</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/thoughts-on-instructions.html" rel="bookmark"
+           title="Permalink to Thoughts on Instructions">Thoughts on Instructions</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-01-20T02:32:00">
+                Sun 20 January 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis.html">rdis</a></p>
+</footer><!-- /.post-info -->      <p>The following are my thoughts while contemplating the construction of an Intermediate Representation for rdis. They thoughts difficult to order, but I will put forth a best-effort.</p>
+<p>Rdis is a tool for analyzing a program given a specific state. It is most helpful in the graphing and display of disassembled instructions. However, when we disassemble these instructions, we are making some assumptions, as instructions are also stateful.</p>
+<p>This makes sense, but is something I have not fully considered before. We live in a Von Neumann world where our instructions exist in the same addressable memory as our data. Sure, well formed programs are loaded to have non-executable memory permissions over data, but memory permissions are modifiable at runtime. When we disassemble, we make the assumption that the instructions, and control-flow observable at a specific program state, will not deviate at future states.</p>
+<p>This assumption works fairly well as, in most cases the assumptions hold true. If, however, given a future state, instructions do deviate, we need to disassemble them to discover how our program has changed.</p>
+<p>Rdis does this with the function <tt class="docutils literal">rdis_update_memory</tt>. Each function in rdis has its bounds defined in a lattice where the greatest lower bound is the address of the lowest addressable instruction in the function's graph, and the least upper bound is the address of the greatest addressable instruction plus the instruction's size in the function's graph. When we update a region of memory, we check to ensure a function does not overlap the updated region. If it does, we have to regraph the function. We only want to update instructions that change, however, as we may otherwise delete additional properties a user has added to an instruction (read comments). This is some of the most complicated code in rdis, especially considering rdis's only internal representation of code is in a directional graph.</p>
+<p>We now return to our instruction, a stateful variable interpreted by the CPU (which has its own state) to update state, and our use of it in an Intermediate Representation. The purpose of translating an instruction to an IR is to perform analysis over the IR in order to derive understanding from future states. Specifically, the addition of data-flow analysis to control-flow of analysis.</p>
+<p>For those of us familiar with exploitation, we know the purpose of exploitation is, usually, to alter control flow in a manner not originally intended by the author. This will most likely involve altering control-flow in a manner not observable without data-flow analysis.</p>
+<p>This is why we fuzz programs. By introducing data into the equation, we hope to place the program into an invalid state, and by observing the conditions which led to this state we hope to modify our data to alter the control flow in an unintended manner. This is also the purpose of symbolic execution and other forms of abstract analysis, to observe the changes in a program's state based possible sets of data.</p>
+<p>This raises interesting questions about the assumptions we make as we analyze disassembled programs. Let's take a look at the following instructions:</p>
+<div class="highlight"><pre>  400080:       eb 00                   jmp    0x400082
+  400082:       c6 04 25 81 00 40 00    mov    BYTE PTR ds:0x400081,0xa
+  400089:       0a
+  40008a:       eb f4                   jmp    0x400080
+  40008c:       b8 3c 00 00 00          mov    eax,0x3c
+  400091:       bf 00 00 00 00          mov    edi,0x0
+  400096:       0f 05                   syscall
+</pre></div>
+<p>The following program is available as a valid x86-64 linux executable here: <a class="reference external" href="http://rainbowsandpwnies.com/~endeavor/files/ins">http://rainbowsandpwnies.com/~endeavor/files/ins</a></p>
+<p>These first three instructions pose an interesting problem for writing a useful disassembler. Given the state presented, clearly the correct disassembly of the instruction at <tt class="docutils literal">0x400080</tt> is <tt class="docutils literal">jmp 0x400082</tt>. This is because, as stated, instructions have state. However, it's evident the control-flow of this program will be altered once the instruction at <tt class="docutils literal">0x400082</tt> has updated state.</p>
+<p>This doesn't seem like much of an issue until you consider the problem of applying data-flow analysis to a CFG to enhance a visual representation of how a program will behave. How should we visualize this program? We could create a CFG that looks like this:</p>
+<div class="highlight"><pre>(400080, jmp 0x400082) -&gt;             \
+(400082, mov BYTE [0x400081], 0xa) -&gt; \
+(400089, jmp 0x400080) -&gt;             \
+(400080, jmp 0x40008c) -&gt;             \
+(40008c, mov eax, 0x3c) ...
+</pre></div>
+<p>And this process would be helpful for a trivial program such as the one described below. However, if we introduce a small loop into the program, such as</p>
+<div class="highlight"><pre><span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mh">0x100</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span> <span class="n">do_things</span><span class="p">();</span> <span class="p">}</span>
+</pre></div>
+<p>Our graph could become unwieldly, depending on do_things(). Perhaps this example isn't the best. Imagine, instead, the assumption we make when interpreting the meaning behind a call in a program loaded in linux without relro protections. We are assuming our entries in the GOT hold addresses to the entries specified in the ELF's relocations. This is a good assumption, as it is generally valid. However, to say a specific entry in the GOT will hold the address intended by the ELF's relocation entry is not correct, as the correct answer is it depends.</p>
+<p>I want rdis to exhibit some form of predictability and correctness. I believe the more correct answer here is to display the interpretation of a program without data-flow analysis, displaying only the state at a specific point in a program's execution. This means deducing control-flow without applying future data into the equation. The alternative would be an attempt to reflect decisions based on future states of the program back onto the current state. While this will usually lead to valid assumptions, I do not believe it is correct.</p>
+<p>I am looking for thoughts and comments on my thought-process, and to what degree data-flow analysis is useful in a tool such as rdis. I put forth there are numerous tools available for the analysis of how programs will behave, and rdis should be concerned with what the current state of a program reflects. Rdis should attempt to hold true to this statement as much as possible.</p>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

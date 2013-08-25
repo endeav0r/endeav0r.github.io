@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>Making a Symbolic Execution Engine</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li class="active"><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="http://tfpwn.rainbowsandpwnies.com/making-a-symbolic-execution-engine.html" rel="bookmark"
+           title="Permalink to Making a Symbolic Execution Engine">Making a Symbolic Execution Engine</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-06-28T15:00:00">
+                Thu 28 June 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/symbolic-execution.html">symbolic execution</a></p>
+</footer><!-- /.post-info -->      <div class="section" id="introduction">
+<h2>Introduction</h2>
+<p>In this post I present my work over the past couple weeks on a symbolic execution engine called <a class="reference external" href="http://github.com/endeav0r/rnp_see">rnp_see</a>. I am releasing it under the GPLv3 license here: rnp_see. Rnp_see is short for, &quot;Rainbows aNd Pwnies Symbolic Execution Engine,&quot; and is pronounced, &quot;rip see.&quot;</p>
+<p>Note that this is experimental code and does not create a complete environment. I am still fixing bugs and it is only implemented to the degree necessary to work through the test cases.</p>
+</div>
+<div class="section" id="building-and-running">
+<h2>Building and Running</h2>
+<p>Requirements: A current c++ compiler which supports c++11 extensions, as well as the udis86 disassembly library. Rnp_see currently uses the gcc extension <tt class="docutils literal">__uint128_t</tt> which requires a 64-bit environment. I am using <tt class="docutils literal">Ubuntu 12.04 <span class="pre">x86-64</span></tt> to build, but I am told the project also successfully builds in an updated <tt class="docutils literal">Fedora 17 <span class="pre">x86-64</span></tt>.</p>
+<p>After grabbing the necessary requirements, clone the repository and run make. A few small test cases are available, of which 1 &amp; 2 are the ones I am currently testing against. Change directory into either test/1 or test/2 and run:</p>
+<div class="highlight"><pre>../../see test
+</pre></div>
+<p>The currently implemented commands are:</p>
+<ul class="simple">
+<li><tt class="docutils literal">a</tt> - (All) run until completion</li>
+<li><tt class="docutils literal">s</tt> - step a single instruction</li>
+<li><tt class="docutils literal">d</tt> - step 8 instructions</li>
+<li><tt class="docutils literal">f</tt> - step 16 instructions</li>
+<li><tt class="docutils literal">g</tt> - step 128 instructions</li>
+<li><tt class="docutils literal">r</tt> - print variables corresponding to x86 registers with their ascii names</li>
+<li><tt class="docutils literal">v</tt> - print all variables</li>
+</ul>
+<p>Most of the time when I run this engine, my command line looks something like this:</p>
+<div class="highlight"><pre>echo gggfffssssr | ../../see test
+</pre></div>
+<p>These applications write to stdout. The engine will create a file based on the filehandle, fh_1, and append all data written to stdout there.</p>
+</div>
+<div class="section" id="basic-engine-design">
+<h2>Basic Engine Design</h2>
+<p>The engine can be broken into the following pieces:</p>
+<ul class="simple">
+<li><strong>Loader</strong>: Responsible for creating the initial environment for the VM.</li>
+<li><strong>Translator</strong>: Translates instructions from the host assembly language to the Intermediate Language used by the VM.</li>
+<li><strong>Memory</strong>: Holds, &quot;Pages,&quot; and contains the memory state of the VM.</li>
+<li><strong>IL Instructions</strong>: RISC type instructions without side-effects, used by the VM to update the state of variables and memory.</li>
+<li><strong>VM</strong>: The main execution environment, or the glue that brings everything else together. Executes instructions in its Intermediate Language to modify the state of memory and variables.</li>
+</ul>
+<p>I wanted the engine to be completely self-contained which, for a few small caveats, it is. By self contained I mean the entire process of loading and executing the target binary is done entirely by the engine without help from the engine's environment. This means the engine must handle system calls internally. This engine is currently targeting non-threaded applications which run in userland, and in its current implementation specifically a linux x86-64 userland environment.</p>
+<p>I wanted the engine to be readily understood and hackable by others. For this reason, I chose c++ as my language of implementation. Someone, somewhere, is grimacing that I am not using ocaml.</p>
+<p>Lastly, the engine must display some sort of zero-configuration default behavior. Currently, one simply passes the name of the target binary to initialize the engine and uses the commands outlined above to begin executing.</p>
+</div>
+<div class="section" id="loader">
+<h2>Loader</h2>
+<p>The current loader supports 64-bit Elf binaries. It interfaces with the VM through a few calls: <tt class="docutils literal">g_memory()</tt>, <tt class="docutils literal">g_variables()</tt>, <tt class="docutils literal">g_ip_id()</tt>. These calls set the initial state of the VM.</p>
+<p><tt class="docutils literal">g_memory()</tt> will create an artificial memory environment for the target binary, any ELFs for which <tt class="docutils literal">DT_NEEDED</tt> entries are available in the Elf dynamic table (read shared objects (read DLLs)), the stack and Thread Local Storage. This work is typically done by the kernel and/or GNU binutils before the binary is entered and is required to create a workable environment for the simple test cases built with current compilers for a current 64-bit linux environment. The loader will perform the necessary relocations found in the provided test cases. Once the memory has been set up and initialized, this memory model is returned to the VM.</p>
+<p><tt class="docutils literal">g_variables()</tt> will return a map of variables representing the initial state of registers when the program is loaded. For example, <tt class="docutils literal">%rsp</tt> must point to memory inside the stack, and <tt class="docutils literal">%fs</tt> must point to the Thread Local Storage Data Structure. <tt class="docutils literal">%rip</tt> points to the entry point of the binary.</p>
+<p><tt class="docutils literal">g_ip_id()</tt> returns the identifier corresponding to the instruction pointer. In our case, <tt class="docutils literal">g_ip_id()</tt> returns the identifier of <tt class="docutils literal">%rip</tt>. The VM only understands its Intermediate Language, memory and variables, and has no knowledge of the host assembly language. For this reason, the <tt class="docutils literal">g_ip_id()</tt> call is necessary.</p>
+</div>
+<div class="section" id="il-instructions">
+<h2>IL Instructions</h2>
+<p>The rnp_see IL instruction set was heavily influenced by the paper: <a class="reference external" href="http://www2.in.tum.de/bib/files/sepp11precise.pdf">Precise Static Analysis of Binaries by Extracting Relational Information</a>.</p>
+<p>The 23 instructions implemented by the rnp_see intermediate language are:</p>
+<ul class="simple">
+<li><strong>General Instructions</strong>: <tt class="docutils literal">syscall</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">store</tt>, <tt class="docutils literal">brc</tt>, <tt class="docutils literal">assign</tt>, <tt class="docutils literal">not</tt>, <tt class="docutils literal">signextend</tt>, <tt class="docutils literal">hlt</tt></li>
+<li><strong>Binary Operation Instructions</strong>: <tt class="docutils literal">add</tt>, <tt class="docutils literal">sub</tt>, <tt class="docutils literal">mul</tt>, <tt class="docutils literal">div</tt>, <tt class="docutils literal">mod</tt>, <tt class="docutils literal">shl</tt>, <tt class="docutils literal">shr</tt>, <tt class="docutils literal">and</tt>, <tt class="docutils literal">or</tt>, <tt class="docutils literal">xor</tt></li>
+<li><strong>Comparison Operation Instructions</strong>: <tt class="docutils literal">cmpeq</tt>, <tt class="docutils literal">cmplts</tt>, <tt class="docutils literal">cmpltu</tt>, <tt class="docutils literal">cmples</tt>, <tt class="docutils literal">cmpleu</tt></li>
+</ul>
+<p>There is currently no difference between the comparison and binary operation instructions.</p>
+<p>Non-conditional branches are translated to conditional branches where the condition is a constant value of 1. Unlike assembly families such as x86, the rnp_see IL instructions have no side-effects. When host assembly is translated to IL, these side-effects are broken out to additional IL instructions and executed explicitly, as is often done in the multitude of literature available (including the above referenced paper).</p>
+</div>
+<div class="section" id="translator">
+<h2>Translator</h2>
+<p>The translator, &quot;translates,&quot; instructions from the host assembly language to the Intermediate Language used by rnp_see. Typically this involves creating several IL instructions per host assembly instruction. The currently implemented translator translates 74 x86-64 instructions to IL instructions.</p>
+<p>The translator was written using the udis86 library and is intended to be easy to understand. Helper functions, such as <tt class="docutils literal">operand_get()</tt> and <tt class="docutils literal">operand_set()</tt> are provided to ease the creation of new instructions. For example, given a memory operand, <tt class="docutils literal">operand_get()</tt> will create the necessary instructions to load value from memory and return an InstructionOperand type which will hold the value after the load completes. <tt class="docutils literal">operand_set()</tt> does the same for writing to memory operands.</p>
+<p>x86-64 assembly allows the loading and storing of 128-bit values. However, rnp_see only supports 64-bit loads and stores (explanation in following paragraph). <tt class="docutils literal">operand_get()</tt>, <tt class="docutils literal">operand_set()</tt> and <tt class="docutils literal">operand_load()</tt> will break 128-bit loads and stores into multiple 64-bit loads and stores appropriately.</p>
+<p>Rnp_see is designed to work only on the types found in <tt class="docutils literal">&lt;inttypes.h&gt;</tt>, or, more specifically, nothing larger than <tt class="docutils literal">uint64_t</tt>. However, it must support 128-bit operations as x86-64 assembly has 128-bit registers. This is done by creating a special class for all SymbolicValue values, UInt, and restricting all 128-bit operations to this class. This class currently uses <tt class="docutils literal">__uint128_t</tt> as its type for storing values, which restricts rnp_see to building and running on systems which support the gcc <tt class="docutils literal">__uint128_t</tt> extension. However, the class can be replaced later with one which does not depend on <tt class="docutils literal">__uint128_t</tt>, allowing rnp_see to build and run on a wider variety of systems.</p>
+<p>The VM uses two functions from the translator, <tt class="docutils literal">translate()</tt> and <tt class="docutils literal">native_asm()</tt>. <tt class="docutils literal">translate()</tt> returns a list of IL instructions for the VM to execute, while <tt class="docutils literal">native_asm()</tt> returns a string representation of the instruction in the host assembly language.</p>
+</div>
+<div class="section" id="memory">
+<h2>Memory</h2>
+<p>Modelling memory appears to be a continuing problem for the design of Symbolic Execution Engines. Rnp_see attempts to use the least memory possible to accomplish its task. Rnp_see's memory model, hereforth referred to as simply Memory, consists of multiple buffers of type Page. Memory maps these pages by their addresses. When a load or store occurs, Memory will locate the correct page and perform the operation at the offset from the page's beginning. Stores and loads across consecutive pages is a problem, and the memory model currently only supports loading 64-bit values across pages.</p>
+<p>The advantage of using pages to model memory comes will be shown when forking the engine during symbolic execution. When a new memory model is created for a forked engine, the child model reference's the parent's pages. From this point onward, both child and parent will perform a copy-on-write for any pages modified after the fork. This allows multiple forked engines to reference the same memory if that memory remains unchanged, and minimizes both the amount of work done and space required to create a new memory model for the child engine.</p>
+</div>
+<div class="section" id="vm">
+<h2>VM</h2>
+<p>The VM receives an initial state from the loader, fetches the bytes pointed to by the Instruction Pointer, passes these bytes to the translator to receive IL instructions, and executes the IL instructions to update its variables and Memory. It maintains both a memory model and a map of identifiers to symbolic values. The SymbolicValue type can hold either concrete values, or expressions which represent a range of possible values. The VM will continue executing until it reaches a hlt instruction, which, as of this writing, is currently the only unimplemented instruction in the VM.</p>
+<p>When the VM reaches a syscall instruction, it passes references to its variables and memory to a kernel. Currently, rnp_see includes a kernel which implements a small subset of x86-64 linux system calls. This kernel will take control of the variables and memory and update them accordingly. As most program input comes from system calls to the kernel, this is a natural place to inject symbolic input into the program. However, as of this writing, the kernel executes concretely as I work through the test cases.</p>
+</div>
+<div class="section" id="conclusion-and-acknowledgments">
+<h2>Conclusion and Acknowledgments</h2>
+<p>I emphasize the code in its current state is experimental quality. It is under continuous development and is suitable for nothing other than reference and experimentation.</p>
+<p>Thanks go to gimpyds for providing the motivation to start writing this thing and answering questions throughout. Additional thanks go to, in alphabetical order, oldgregg, twabulldog, v1013nt and vnutz (who provided crazy context on the <tt class="docutils literal">movsd</tt> instruction).</p>
+</div>
+
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

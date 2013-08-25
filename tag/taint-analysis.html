@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>endeavor [at] rainbowsandpwnies.com - taint analysis</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="http://tfpwn.rainbowsandpwnies.com/finding-sqli-through-taint-analysis.html">Finding SQLI Through Taint Analysis</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2012-08-23T18:03:00">
+                Thu 23 August 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/taint-analysis.html">taint analysis</a></p>
+</footer><!-- /.post-info --><div class="section" id="introduction">
+<h2>Introduction</h2>
+<p>Two days ago I decided it was time to begin working on my taint analysis engine for PHP. I just looked up a SQLI on exploitdb to see if I could detect it and... success. The vulnerability can be found <a class="reference external" href="http://www.exploit-db.com/exploits/20673/">here</a>, a SQLI in <a class="reference external" href="http://www.yourarcadescript.com/">YourArcadeScript</a> 2.4 (hereforth known as YAS).</p>
+</div>
+<div class="section" id="vulnerability-details">
+<h2>Vulnerability Details</h2>
+<p>The vulnerable line is found in <tt class="docutils literal">templates/modbox_24/category.php</tt>, line 36.</p>
+<div class="highlight"><pre><span class="x">38: $count = yasDB_select(&quot;SELECT count(id) AS count FROM `games` where category = &quot; . $_GET[&#39;id&#39;]);</span>
+</pre></div>
+<p>The file <tt class="docutils literal">tempates/modbox_24/categories.php</tt> is included from index.php via line 54.</p>
+<div class="highlight"><pre><span class="x">53: case &#39;cat&#39;:</span>
+<span class="x">54:     include (&quot;templates/&quot;.$setting[&#39;theme&#39;].&quot;/category.php&quot;);</span>
+<span class="x">55:     break;</span>
+</pre></div>
+<p>This is a trivial SQL Injection and can be found with little effort by my all-time-favorite web-app vulnerability finding application: <tt class="docutils literal">grep</tt>. The following line shows multiple concerning queries:</p>
+<p><tt class="docutils literal">grep <span class="pre">-rn</span> SELECT * | grep GET</tt></p>
+<p>A few simple greps shows multiple scary queries, but that's beyond the scope of this post. Grep won't give you vulnerabilities such as CSRF, but as a rule, if a webapp doesn't pass the grep test please don't even consider deploying it.</p>
+</div>
+<div class="section" id="configuring-the-engine-for-yas">
+<h2>Configuring the engine for YAS</h2>
+<p>There are four pieces of information our taint analysis engine must know in order to detect this vulnerability. They are:</p>
+<ol class="arabic simple">
+<li>Sources of <tt class="docutils literal">TAINT</tt>.</li>
+<li>Functions that <tt class="docutils literal">SANITIZE</tt>.</li>
+<li>Functions to alert when variables from <tt class="docutils literal">TAINT</tt> are passed to <tt class="docutils literal">USE</tt>.</li>
+<li>Constant values for a few select variables.</li>
+</ol>
+<p>1-3 are self-explanatory. If not, my last blog post may be helpful.</p>
+<p>We need constant values for variables because YAS has include lines that require variables to have specific values. My taint analysis engine does not store values, only taint. When an include fails to resolve a path, we get an error line like this:</p>
+<div class="highlight"><pre>could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/play.php&#39;)
+</pre></div>
+<p>Normally this means we need to set a value for <tt class="docutils literal"><span class="pre">ArrayOffset(Variable('$setting'),</span> 'theme)</tt>. In this specific case, the value has already been set to <tt class="docutils literal">&quot;modbox_24&quot;</tt> and the file <tt class="docutils literal">templates/modbox_24/play.php</tt> does not exist.</p>
+<p>For YAS, we only set one value in <tt class="docutils literal">DEFINES</tt></p>
+<div class="highlight"><pre><span class="n">DEFINES</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">DEFINES</span><span class="p">[</span><span class="s">&quot;ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;modbox_24&#39;</span>
+</pre></div>
+<p>Now we need to set 1-3. Sources of TAINT do not change. Currently I am only checking $_GET and $_POST.</p>
+<p>The values for SANITIZE and USE are set as follows:</p>
+<div class="highlight"><pre><span class="n">SANITATION_FUNCTIONS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s">&#39;intval&#39;</span><span class="p">,</span>
+    <span class="s">&#39;yasDB_clean&#39;</span><span class="p">,</span>
+    <span class="s">&#39;htmlspecialchars&#39;</span>
+<span class="p">]</span>
+
+<span class="n">TARGET_FUNCTIONS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s">&#39;yasDB_select&#39;</span><span class="p">,</span>
+    <span class="s">&#39;yasDB_update&#39;</span><span class="p">,</span>
+    <span class="s">&#39;yasDB_insert&#39;</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<div class="section" id="running-the-engine-and-results">
+<h2>Running the engine and results</h2>
+<p>Now all that's left is to execute the engine against index.php. Here's what we get:</p>
+<div class="highlight"><pre>[endeavor@endeavor php-static]$ time pypy analyze.py ~/sources/yas/index.php
+======================================
+ANALYZING:  /home/endeavor/sources/yas/index.php
+could not include includes/db_functions.inc.php includes/db_functions.inc.php
+could not include includes/config.inc.php includes/config.inc.php
+could not include seourl.class.php seourl.class.php
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/small_footer.php&#39;) templates/modbox_24/small_footer.php
+could not include rightcolumn.php rightcolumn.php
+function :  yasDB_select
+parameter:  SELECT count(id) AS count FROM `games` where category = $_GET
+tainted  :  [&#39;$page&#39;]
+function :  yasDB_select
+parameter:  SELECT * FROM `games` where category = $_GET order by `id` desc LIMIT ObjectProperty(Variable(&#39;$pageurl&#39;), &#39;start&#39;), ObjectProperty(Variable(&#39;$pageurl&#39;), &#39;limit&#39;)
+tainted  :  [&#39;$page&#39;]
+could not include rightcolumn.php rightcolumn.php
+function :  yasDB_select
+parameter:  SELECT * FROM user WHERE username=&#39;$username&#39; AND email=&#39;$useremail&#39;
+tainted  :  [&#39;$username&#39;, &#39;$useremail&#39;]
+function :  yasDB_update
+parameter:  UPDATE user SET password=&#39;$upassword&#39; WHERE username=&#39;$username&#39;
+tainted  :  [&#39;$username&#39;, &#39;$useremail&#39;]
+function :  yasDB_insert
+parameter:  INSERT INTO favourite (userid, gameid) VALUES($_SESSION, $_POST)
+tainted  :  []
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/play.php&#39;) templates/modbox_24/play.php
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/popularbig.php&#39;) templates/modbox_24/popularbig.php
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/topratedbig.php&#39;) templates/modbox_24/topratedbig.php
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/latestbig.php&#39;) templates/modbox_24/latestbig.php
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/privacy.php&#39;) templates/modbox_24/privacy.php
+could not include BinaryOp(&#39;.&#39;, BinaryOp(&#39;.&#39;, &#39;templates/&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;theme&#39;)), &#39;/login2.php&#39;) templates/modbox_24/login2.php
+could not include BinaryOp(&#39;.&#39;, ArrayOffset(Variable(&#39;$setting&#39;), &#39;siteurl&#39;), &#39;/includes/db_functions.inc.php&#39;) /includes/db_functions.inc.php
+could not include ../includes/db_functions.inc.php ../includes/db_functions.inc.php
+forks:  614
+
+real    0m21.031s
+user    0m20.909s
+sys     0m0.063s
+</pre></div>
+<p>First, an explanation of the output. When a tainted variable is used, three lines are printed out. First, the function, followed by the parameter where the tainted variable was found, and then the list of all currently tainted variables. The vulnerability we were looking for is evident here:</p>
+<div class="highlight"><pre>function :  yasDB_select
+parameter:  SELECT count(id) AS count FROM `games` where category = $_GET
+tainted  :  [&#39;$page&#39;]
+function :  yasDB_select
+parameter:  SELECT * FROM `games` where category = $_GET order by `id` desc LIMIT ObjectProperty(Variable(&#39;$pageurl&#39;), &#39;start&#39;), ObjectProperty(Variable(&#39;$pageurl&#39;), &#39;limit&#39;)
+tainted  :  [&#39;$page&#39;]
+</pre></div>
+<p>We actually turned up a few new vulnerabilities. For the sake of completion, the first two are in <tt class="docutils literal">includes/forgotpass.php</tt></p>
+<div class="highlight"><pre><span class="cp">&lt;?php</span>
+<span class="k">include</span> <span class="p">(</span><span class="s2">&quot;db_functions.inc.php&quot;</span><span class="p">);</span>
+<span class="k">include</span> <span class="p">(</span><span class="s2">&quot;config.inc.php&quot;</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">(</span><span class="nb">isset</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s2">&quot;username&quot;</span><span class="p">])</span> <span class="o">&amp;&amp;</span> <span class="nb">isset</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s2">&quot;useremail&quot;</span><span class="p">]))</span> <span class="p">{</span>
+    <span class="nv">$username</span><span class="o">=</span><span class="nv">$_POST</span><span class="p">[</span><span class="s2">&quot;username&quot;</span><span class="p">];</span>
+    <span class="nv">$useremail</span><span class="o">=</span><span class="nv">$_POST</span><span class="p">[</span><span class="s2">&quot;useremail&quot;</span><span class="p">];</span>
+    <span class="nv">$res</span><span class="o">=</span><span class="nx">yasDB_select</span><span class="p">(</span><span class="s2">&quot;SELECT * FROM user WHERE username=&#39;</span><span class="si">$username</span><span class="s2">&#39; AND email=&#39;</span><span class="si">$useremail</span><span class="s2">&#39;&quot;</span><span class="p">,</span><span class="k">false</span><span class="p">);</span>
+    <span class="nv">$row</span> <span class="o">=</span> <span class="nv">$res</span><span class="o">-&gt;</span><span class="na">fetch_array</span><span class="p">(</span><span class="nx">MYSQLI_ASSOC</span><span class="p">);</span>
+    <span class="nv">$res</span><span class="o">-&gt;</span><span class="na">close</span><span class="p">();</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="k">empty</span><span class="p">(</span><span class="nv">$row</span><span class="p">))</span> <span class="p">{</span>
+        <span class="nv">$email</span><span class="o">=</span><span class="nv">$row</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">];</span>
+        <span class="nx">srand</span><span class="p">((</span><span class="nx">double</span><span class="p">)</span><span class="nb">microtime</span><span class="p">()</span><span class="o">*</span><span class="mi">1000000</span><span class="p">);</span>
+        <span class="nv">$random</span><span class="o">=</span><span class="nx">rand</span><span class="p">(</span><span class="mi">1234</span><span class="p">,</span><span class="mi">2343</span><span class="p">);</span>
+        <span class="nv">$password</span><span class="o">=</span><span class="nv">$row</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span><span class="o">.</span><span class="nv">$random</span><span class="p">;</span>
+        <span class="nv">$upassword</span><span class="o">=</span><span class="nb">md5</span><span class="p">(</span><span class="nv">$password</span><span class="p">);</span>
+        <span class="nx">yasDB_update</span><span class="p">(</span><span class="s2">&quot;UPDATE user SET password=&#39;</span><span class="si">$upassword</span><span class="s2">&#39; WHERE username=&#39;</span><span class="si">$username</span><span class="s2">&#39;&quot;</span><span class="p">,</span><span class="k">false</span><span class="p">);</span>
+</pre></div>
+<p>The third is in <tt class="docutils literal">templates/modbox_24/game.php</tt></p>
+<div class="highlight"><pre><span class="cp">&lt;?php</span>
+<span class="o">@</span><span class="nb">session_start</span><span class="p">();</span>
+<span class="cp">?&gt;</span><span class="x"></span>
+<span class="x">&lt;script type=&quot;text/javascript&quot;&gt;</span>
+<span class="x">    var yasurl = &quot;</span><span class="cp">&lt;?php</span> <span class="k">echo</span> <span class="nv">$setting</span><span class="p">[</span><span class="s1">&#39;siteurl&#39;</span><span class="p">]</span><span class="o">.</span><span class="s1">&#39;includes/ratingbar/rpc.php&#39;</span><span class="p">;</span><span class="cp">?&gt;</span><span class="x">&quot;;</span>
+<span class="x">&lt;/script&gt;</span>
+<span class="cp">&lt;?php</span>
+<span class="k">require</span><span class="p">(</span><span class="s1">&#39;./includes/ratingbar/_drawrating.php&#39;</span><span class="p">);</span> <span class="c1">// processes game votes and displays stars</span>
+<span class="nv">$id</span> <span class="o">=</span> <span class="nx">yasDB_clean</span><span class="p">(</span><span class="nv">$_GET</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]);</span>
+<span class="nv">$gid</span> <span class="o">=</span> <span class="nv">$id</span><span class="p">;</span>
+<span class="nv">$displayed</span> <span class="o">=</span> <span class="s1">&#39;no&#39;</span><span class="p">;</span>
+<span class="k">if</span> <span class="p">(</span><span class="nb">isset</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">&#39;Favourites_x&#39;</span><span class="p">]))</span> <span class="p">{</span>
+    <span class="nx">yasDB_insert</span><span class="p">(</span><span class="s2">&quot;INSERT INTO favourite (userid, gameid) VALUES(</span><span class="si">{</span><span class="nv">$_SESSION</span><span class="p">[</span><span class="s1">&#39;userid&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">&#39;gamesave&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span> <span class="k">or</span> <span class="k">die</span><span class="p">(</span><span class="s2">&quot;Error updating favourites&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="section" id="next-steps">
+<h2>Next Steps</h2>
+<p>Objects are currently ignored. Method calls in the AST are evaluated as regular function calls, treating the method name as a simple function. This allows us to set method names as target USE functions and check for php code such as:</p>
+<div class="highlight"><pre><span class="x">$query = $db-&gt;query(&quot;SELECT * FROM example WHERE id=&quot; . $GET[&#39;id&#39;]);</span>
+</pre></div>
+<p>However we won't evaluate code inside object methods. This is important as we will evaluate code within regular functions.</p>
+<p>That's all for now. Cheers.</p>
+</div>
+                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/dealing-with-path-explosion-in-static-taint-analysis.html" rel="bookmark"
+                           title="Permalink to Dealing with Path Explosion in Static Taint Analysis">Dealing with Path Explosion in Static Taint Analysis</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2012-08-22T17:26:00">
+                Wed 22 August 2012
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/taint-analysis.html">taint analysis</a></p>
+</footer><!-- /.post-info -->                <p>I'm writing a taint analysis engine and I explore all possible traces. I have a method to offset exponential path explosion. This has probably been done before, but I'll write down what I'm doing anyway.</p>
+<p>First I'll pseudo-define a simple grammar</p>
+<div class="highlight"><pre>Variables    := $[A-Z]
+Functions    := [a-z](&lt;parameter ...</pre></div>
+                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/dealing-with-path-explosion-in-static-taint-analysis.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+            </ol><!-- /#posts-list -->
+<p class="paginator">
+    Page 1 / 1
+</p>
+            </section><!-- /#content -->
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8">
+        <title>endeavor [at] rainbowsandpwnies.com - theory</title>
+        <link rel="stylesheet" href="http://tfpwn.rainbowsandpwnies.com/theme/css/main.css">
+        <link href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="endeavor [at] rainbowsandpwnies.com Atom Feed" />
+
+        <!--[if IE]>
+            <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="http://tfpwn.rainbowsandpwnies.com/">endeavor [at] rainbowsandpwnies.com </a></h1>
+                <nav><ul>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/pages/about.html">about</a></li>
+                    <li><a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="http://tfpwn.rainbowsandpwnies.com/a-method-for-emulated-disassembly.html">A Method for Emulated Disassembly</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2013-02-18T11:00:00">
+                Mon 18 February 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis.html">rdis</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
+</footer><!-- /.post-info --><p>Last night I wrote a simple emulated disassembler for rdis. I will elaborate more on how to use this disassembler as it becomes more complete, but I'm going to start this blog post with some results.</p>
+<p>Observe the following x86 program:</p>
+<div class="highlight"><pre><span class="cp">%define SYS_EXIT  1</span>
+
+<span class="k">section</span> <span class="nv">.text</span>
+    <span class="k">global</span> <span class="nv">_start</span>
+
+<span class="nf">_start</span> <span class="p">:</span>
+    <span class="nf">jmp</span> <span class="nv">one</span>
+
+<span class="nf">one</span> <span class="p">:</span>
+    <span class="nf">mov</span> <span class="kt">byte</span> <span class="p">[</span><span class="mh">0x8048061</span><span class="p">],</span> <span class="mi">9</span>
+    <span class="nf">jmp</span> <span class="nv">_start</span>
+
+<span class="nf">two</span> <span class="p">:</span>
+    <span class="nf">mov</span> <span class="nb">eax</span><span class="p">,</span> <span class="nv">SYS_EXIT</span>
+    <span class="nf">mov</span> <span class="nb">ebx</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="nf">int</span> <span class="mh">0x80</span>
+</pre></div>
+<p>This program is what some people would describe as polymorphic. A naive recursive disassembly yields the following block:</p>
+<img alt="" src="http://tfpwn.rainbowsandpwnies.com/files/ins32_graph_wrong.png" />
+<p>An emulated disassembly yields the following program (vocabulary changed intentionally):</p>
+<img alt="" src="http://tfpwn.rainbowsandpwnies.com/files/ins32_graph.png" />
+<p>Notice we have multiple disassembles for an instruction at address 0x8048060.</p>
+<p>In the rest of this blog post I explain the method in which I generated this CFG.</p>
+<p>Given a function <tt class="docutils literal">Emulator</tt>, which takes as its input an ordered set of numbers <tt class="docutils literal">Memory</tt> and an index <tt class="docutils literal">Address</tt>, <tt class="docutils literal">Emulator</tt> returns:</p>
+<ul class="simple">
+<li>A boolean condition indicating whether the inputs were valid for <tt class="docutils literal">Emulator</tt>.</li>
+<li>An <tt class="docutils literal">Instruction</tt> disassembled at <tt class="docutils literal">Address</tt> passed to <tt class="docutils literal">Emulator</tt>.</li>
+<li>A new <tt class="docutils literal">Memory</tt> to be passed back into <tt class="docutils literal">Emulator</tt>.</li>
+<li>A new <tt class="docutils literal">Address</tt> to be passed back into <tt class="docutils literal">Emulator</tt>.</li>
+</ul>
+<p>We have a directional graph <tt class="docutils literal">Graph</tt>, with vertices <tt class="docutils literal">V</tt> and edges <tt class="docutils literal">E</tt>, as are typical of directional graphs, such that any edge <tt class="docutils literal">e</tt> of <tt class="docutils literal">E</tt> is an ordered tuple of vertices <tt class="docutils literal">vHead</tt> and <tt class="docutils literal">vTail</tt> of <tt class="docutils literal">V</tt> where <tt class="docutils literal">vHead</tt> and <tt class="docutils literal">vTail</tt> must exist in the set <tt class="docutils literal">V</tt>, and there may exist only one <tt class="docutils literal">e</tt> in <tt class="docutils literal">E</tt> for any ordered tuple <tt class="docutils literal">vHead</tt> and <tt class="docutils literal">vTail</tt>.</p>
+<p>We have the following functions which operate over Graph:</p>
+<ul class="simple">
+<li><tt class="docutils literal">NewVertex(Graph)</tt> -&gt; Returns a new vertex in <tt class="docutils literal">Graph</tt>.</li>
+<li><tt class="docutils literal">NewEdge(Graph, vHead, vTail)</tt> -&gt; Creates a new edge in the <tt class="docutils literal">Graph</tt>, enforcing the conditions of <tt class="docutils literal">Graph</tt>.</li>
+</ul>
+<p>We have a function <tt class="docutils literal">Map</tt> which takes as its input an <tt class="docutils literal">Address</tt> and returns as its result a vertex <tt class="docutils literal">v</tt> of <tt class="docutils literal">V</tt>.</p>
+<p>Our algorithm may then look like:</p>
+<div class="highlight"><pre>zero(Graph)
+zero(Map)
+
+LastVertex = Nil
+
+while Emulator(Memory, Address)&#39;Valid
+    if Map(Address) exists
+        v = Map(Address)
+
+        if v&#39;Instruction != Emulator(Memory, Address)&#39;Instruction
+            v = NewVertex(Graph)
+            v&#39;Instruction = Emulator(Memory, Address)&#39;Instruction
+            Map(Address) = v
+
+    else
+        v = NewVertex(Graph)
+        v&#39;Instruction = Emulator(Memory, Address)&#39;Instruction
+        Map(Address) = v
+
+    NewEdge(Graph, LastVertex, v)
+    LastVertex = v
+    Memory, Address = Emulator(Memory, Address)&#39;Step
+</pre></div>
+                </article>
+            </aside><!-- /#featured -->
+                <section id="content" class="body">
+                    <h1>Other articles</h1>
+                    <hr />
+                    <ol id="posts-list" class="hfeed">
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/control-flow-graphs-should-be-magical.html" rel="bookmark"
+                           title="Permalink to Control Flow Graphs Should Be Magical Time-Traveling Devices">Control Flow Graphs Should Be Magical Time-Traveling Devices</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-02-14T00:55:00">
+                Thu 14 February 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/disassembly.html">disassembly</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
+</footer><!-- /.post-info -->                <p>If you didn't know, I've spent some time recently writing a disassembler and thinking about disassembly. I'm going to outline some of my thoughts on where I think disassembly needs to go. There are gaps in this post. Consider it food for thought.</p>
+<p>We currently have two ...</p>
+                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/control-flow-graphs-should-be-magical.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/again-on-instructions-there-is-no-spoon.html" rel="bookmark"
+                           title="Permalink to Again on Instructions: There Is No Spoon">Again on Instructions: There Is No Spoon</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-01-31T01:38:00">
+                Thu 31 January 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a></p>
+</footer><!-- /.post-info -->                <div class="section" id="an-edit-from-the-future">
+<h2>An Edit From the Future</h2>
+<p>I mention the Defcon 20 talk &quot;Programming Weird Machines with ELF Metadata&quot; in this article. After rewatching the video (<a class="reference external" href="https://www.defcon.org/html/links/dc-archives/dc-20-archive.html#Shapiro">Which you should watch, you are a fool if you don't</a>), I believe 90% of what you are about to read is merely ideas planted ...</p></div>
+                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/again-on-instructions-there-is-no-spoon.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+
+            <li><article class="hentry">
+                <header>
+                    <h1><a href="http://tfpwn.rainbowsandpwnies.com/thoughts-on-instructions.html" rel="bookmark"
+                           title="Permalink to Thoughts on Instructions">Thoughts on Instructions</a></h1>
+                </header>
+
+                <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2013-01-20T02:32:00">
+                Sun 20 January 2013
+        </abbr>
+
+        <address class="vcard author">
+                By <a class="url fn" href="http://tfpwn.rainbowsandpwnies.com/author/endeavor.html">endeavor</a>
+        </address>
+<p>In <a href="http://tfpwn.rainbowsandpwnies.com/category/blog.html">blog</a>. </p>
+<p>tags: <a href="http://tfpwn.rainbowsandpwnies.com/tag/theory.html">theory</a><a href="http://tfpwn.rainbowsandpwnies.com/tag/rdis.html">rdis</a></p>
+</footer><!-- /.post-info -->                <p>The following are my thoughts while contemplating the construction of an Intermediate Representation for rdis. They thoughts difficult to order, but I will put forth a best-effort.</p>
+<p>Rdis is a tool for analyzing a program given a specific state. It is most helpful in the graphing and display of disassembled ...</p>
+                <a class="readmore" href="http://tfpwn.rainbowsandpwnies.com/thoughts-on-instructions.html">read more</a>
+                </div><!-- /.entry-content -->
+            </article></li>
+            </ol><!-- /#posts-list -->
+<p class="paginator">
+    Page 1 / 1
+</p>
+            </section><!-- /#content -->
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>blogroll</h2>
+                        <ul>
+                            <li><a href="http://github.com/endeav0r">github</a></li>
+                            <li><a href="http://www.linkedin.com/in/alexeubanks/">linkedin</a></li>
+                            <li><a href="http://twitter.com/rednovae">twitter</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+                            <li><a href="http://tfpwn.rainbowsandpwnies.com/feeds/all.atom.xml" type="application/atom+xml" rel="alternate">atom feed</a></li>
+
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>
